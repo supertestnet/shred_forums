@@ -36,7 +36,7 @@
             }
             .header {
                 background-color: black;
-                background-image: url( 'black-and-blue-background.svg' );
+                background-image: url( 'https://supertestnet.github.io/shred_forums/black-and-blue-background.svg' );
                 background-size: cover;
                 background-position: 50% 50%;
                 background-repeat: no-repeat;
@@ -464,9 +464,8 @@
                         //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
                         var tags = [ [ "e", "0000000000000000000000000000000000000000000000000000746872656164" ], [ "n", subforum ] ];
                     } else {
-                        //00000000000000000000000000000000000000000000000000636f6d6d656e74 means "comment"
                         var [ parent_pubkey, parent_relays ] = shred_forums.convertNEvent( parent_nevent );
-                        var tags = [ [ "e", parent_pubkey, parent_relays[ 0 ] ], [ "e", "00000000000000000000000000000000000000000000000000636f6d6d656e74" ] ];
+                        var tags = [ [ "e", parent_pubkey, parent_relays[ 0 ] ] ];
                     }
                     if ( title ) tags.push( [ "t", title ] );
                     var now = Math.floor( Date.now() / 1000 );
@@ -1039,8 +1038,7 @@
                     var until = null;
                     var since = null;
                     var limit = null;
-                    //00000000000000000000000000000000000000000000000000636f6d6d656e74 is "comment" turned into hex and padded to 32 bytes
-                    var etags = [ '00000000000000000000000000000000000000000000000000636f6d6d656e74', event_id ];
+                    var etags = [ event_id ];
                     var events = await super_nostr.getEvents( relay, ids, authors, kinds, until, since, limit, etags );
                     if ( !events.length ) $( '.all_topics' ).innerHTML = `None found`;
                     events.forEach( event => shred_forums.events_to_display[ event.id ] = event );
