@@ -1,0 +1,1100 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <title>Shred Forums</title>
+        <link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Comic+Neue&display=swap" rel="stylesheet">
+        <script src="https://opentimestamps.org/assets/javascripts/vendor/opentimestamps.min.js"></script>
+        <script src="https://bundle.run/buffer@6.0.3"></script>
+        <script>var Buffer = buffer.Buffer;</script>
+        <script src="https://supertestnet.github.io/bolt11_browser/bolt11.js"></script>
+        <script src="https://supertestnet.github.io/bankify/super_nostr.js"></script>
+        <script src="https://supertestnet.github.io/nip44js/nip44.js"></script>
+        <script src="https://supertestnet.github.io/nwcjs/nwcjs.js"></script>
+        <script src="https://bundle.run/noble-secp256k1@1.2.14"></script>
+        <script src="https://bundle.run/bech32@2.0.0"></script>
+        <script src="https://bundle.run/bip39@3.0.4"></script>
+        <script src="https://bundle.run/bip32@2.0.6"></script>
+        <style>
+            * {
+                box-sizing: border-box;
+                font-size: 1.15rem;
+                font-family: 'Open Sans', sans-serif;
+                /*font-family: Arial, sans-serif;*/
+            }
+            html {
+                padding: 0;
+            }
+            body {
+                margin: 0;
+                word-wrap: break-word;
+                position: absolute;
+                top: 0px;
+                width: 100%;
+            }
+            .header {
+                background-color: black;
+                background-image: url( 'black-and-blue-background.svg' );
+                background-size: cover;
+                background-position: 50% 50%;
+                background-repeat: no-repeat;
+                /*margin-left: -3rem;*/
+                color: white;
+                /*width: calc( 100% + 6rem );*/
+                width: 100%;
+                height: 10rem;
+                padding: 0.5rem 1.5rem;
+                border-bottom: 2px solid black;
+                display: flex;
+                align-items: center;
+                box-shadow: -1px 2px 4px black;
+            }
+            .inner_header {
+                /*width: calc( 100% - 5rem );*/
+                width: 100%;
+                max-width: calc( 800px - 3rem );
+                margin: auto;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .non_header {
+                max-width: 800px;
+                padding: 1rem 1rem;
+                margin: auto;
+                line-height: 1.25;
+                padding-bottom: 15rem;
+            }
+            h1 {
+                font-size: 2rem;
+            }
+            h2 {
+                font-size: 1.5rem;
+            }
+            input, textarea {
+                line-height: 1.25;
+                width: 100%;
+                height: 1.8rem;
+                font-size: 1.15rem;
+                border: 1px solid grey;
+            }
+            textarea {
+                height: 5rem;
+            }
+            .hidden {
+                display: none !important;
+            }
+            .site_name {
+                cursor: pointer;
+            }
+            .login_btn:hover {
+                text-decoration: underline;
+                cursor: pointer;
+            }
+            .featured_topics_title, .all_topics_title {
+                font-family: "Comic Neue", sans-serif;
+                font-size: 200%;
+                font-weight: bold;
+                text-align: center;
+            }
+            .all_topics_title {
+                text-align: inherit;
+            }
+            .bold {
+                font-weight: bold;
+            }
+            .new_btn {
+                background-color: red;
+                color: white;
+                font-weight: bold;
+                aspect-ratio: 1/1;
+                width: 3rem;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: fixed;
+                bottom: 1rem;
+                right: 1rem;
+                cursor: pointer;
+                box-shadow: 2px 2px 4px black;
+            }
+            .thread_summary {
+                margin: 1rem 0;
+                border: 1px solid black;
+                border-radius: 1rem;
+                padding: 1rem;
+                cursor: pointer;
+            }
+            .thread_summary .thread_title {
+                font-weight: bold;
+                margin-bottom: .5rem;
+            }
+            .thread_summary .thread_meta,
+            .thread_page .thread_meta,
+            .thread_page .comment_meta {
+                margin-top: 10px;
+                display: flex;
+                flex: 2 auto auto;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            .thread_summary .pic_and_nym,
+            .thread_summary .thread_timestamp,
+            .thread_summary .thread_subforum,
+            .thread_page .pic_and_nym,
+            .thread_page .thread_timestamp,
+            .thread_page .thread_subforum,
+            .thread_page .comment_timestamp {
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+            }
+            .thread_summary .pic_and_nym:hover .author_nym,
+            .thread_page .pic_and_nym:hover .author_nym {
+                text-decoration: underline;
+            }
+            .thread_summary .thread_subforum:hover,
+            .thread_page .thread_subforum:hover {
+                text-decoration: underline;
+            }
+            .thread_summary .author_pic,
+            .thread_page .author_pic {
+                display: inline-block;
+                vertical-align: middle;
+                aspect-ratio: 1/1;
+                width: 2rem;
+                background-size: cover;
+                background-repeat: no-repeat;
+                background-position: 50% 50%;
+                float: left;
+                margin-right: 10px;
+            }
+            .thread_summary .author_nym,
+            .thread_page .author_nym {
+                display: inline-block;
+                vertical-align: middle;
+            }
+            .proof_of_ownership {
+                background-color: tan;
+                padding: 1rem;
+            }
+            .thread_log_in {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background-color: #cccccc;
+                padding: 0 1rem;
+                border-radius: 1rem;
+                cursor: pointer;
+            }
+            .thread_log_in .thread_log_in_btn {
+                cursor: pointer;
+            }
+            .thread_comment {
+                background-color: #eaebb0;
+                padding: 0.5rem;
+                padding-bottom: 1rem;
+                margin-top: 1rem;
+            }
+            .thread_comment * {
+                font-size: 85%;
+            }
+            .thread_comment .comment_timestamp {
+                font-size: 70%;
+            }
+            .thread_comment .author_pic {
+                width: 1.5rem;
+            }
+            .thread_page .comment_content {
+                margin-top: 0.5rem;
+                font-size: 80%;
+            }
+            @media screen and (max-width: 600px) {
+            }
+        </style>
+        <style>
+            .black-bg {
+                width: 100%;
+                position: fixed;
+                top: 0;
+                left: 0;
+                background-color: black;
+                opacity: .5;
+                width: 100vw;
+                height: 100vh;
+            }
+            .modal {
+                position: fixed;
+                box-sizing: border-box;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%,-50%);
+                width: 90%;
+                max-width: 560px;
+                background-color: white;
+                border-radius: 1rem;
+                padding: 20px;
+                color: black;
+                text-align: center;
+                word-wrap: break-word;
+            }
+            .modal * {
+                color: black;
+            }
+            .modal input, .modal textarea {
+                max-width: 90%;
+            }
+        </style>
+        <script>
+            var modalVanish = () => {
+                $( ".black-bg" ).classList.add( "hidden" );
+                $( ".modal" ).classList.add( "hidden" );
+            }
+            var showModal = content => {
+                $( ".modal" ).innerHTML = `<div class="x_modal" style="position: absolute;right: 1rem;top: 0.5rem;font-size: 2rem; cursor: pointer; color: black;" onclick="modalVanish()">&times;</div>`;
+                $( ".modal" ).innerHTML += `<div style="overflow-y: auto; max-height: 80vh; margin-top: 1.5rem;">${content}</div>`;
+                $( ".black-bg" ).classList.remove( "hidden" );
+                $( ".modal" ).classList.remove( "hidden" );
+            }
+        </script>
+        <script>
+            var $ = document.querySelector.bind( document );
+            var $$ = document.querySelectorAll.bind( document );
+            var url_params = new URLSearchParams( window.location.search );
+            var url_keys = url_params.keys();
+            var $_GET = {}
+            for ( var key of url_keys ) $_GET[ key ] = url_params.get( key );
+            var hash_arr = window.location.href.substring( window.location.href.indexOf( "#" ) ).split( "#" );
+            hash_arr.splice( 0, 1 );
+            var params = {}
+            hash_arr.forEach( item => {
+                var vals = item.split( "=" );
+                params[ vals[ 0 ] ] = vals[ 1 ];
+            });
+        </script>
+    </head>
+    <body>
+        <div class="header">
+            <div class="inner_header">
+                <h1 class="site_name">Shred Forums</h1>
+                <p class="login_btn"></p>
+            </div>
+        </div>
+        <div class="non_header">
+            <div class="home_page">
+                <div class="featured_topics hidden">
+                    <div class="featured_topics_title">Featured Topic</div>
+                    <div class="featured_topics"></div>
+                </div>
+                <div class="all_topics_title">All topics</div>
+                <div class="all_topics">loading...</div>
+            </div>
+            <div class="profile_page hidden">
+                <h1>Profile page</h1>
+                <p><button class="auth_with_nostr">Authenticate with nostr</button></p>
+                <p><button class="log_out_btn">Log out</button></p>
+            </div>
+            <div class="new_thread_page hidden">
+                <h1>New thread</h1>
+                <p>Title</p>
+                <p><input class="thread_title"></p>
+                <p>Content</p>
+                <p><textarea class="thread_content"></textarea></p>
+                <p>Subforum</p>
+                <p><input class="thread_subforum"></p>
+                <p><button class="submit_new_thread">Submit</button></p>
+            </div>
+            <div class="thread_page hidden">
+                <h1 class="thread_title">&nbsp;</h1>
+                <hr>
+                <div class="thread_meta">
+                    <div class="pic_and_nym">
+                        <div class="author_pic"></div>
+                        <div class="author_nym">loading...</div>
+                    </div>
+                    <div class="thread_timestamp"></div>
+                    <div class="thread_subforum bold"></div>
+                </div>
+                <hr>
+                <p class="thread_content"></p>
+                <div class="thread_log_in">
+                    <p class="thread_log_in_msg">Log in to comment</p>
+                    <p><button class="thread_log_in_btn">Log&nbsp;in</button></p>
+                </div>
+                <div class="thread_reply_div hidden">
+                    <hr>
+                    <p>Enter your comment</p>
+                    <p><textarea class="thread_reply_box"></textarea></p>
+                    <p><button class="submit_thread_reply">Submit</button></p>
+                </div>
+                <div class="thread_comments"></div>
+            </div>
+        </div>
+        <div class="new_btn hidden">+</div>
+        <script>
+            var shred_forums = {
+                relays: [ "wss://nostrue.com" ],
+                privkey: null,
+                profiles: {},
+                events_to_display: {},
+                events_displayed: [],
+                zapgate: "supertestnet@coinos.io",
+                zapgate_amt_to_post: 10, //paying this amount of sats lets users create 30 posts -- if any user hits that limit, they cannot post again unless they pay this amount again
+                zapgate_amt_to_moderate: 30_000, //paying this amount of sats lets any user become a moderator of a subforum that does not yet *have* a moderator
+                moderator_expiry: 90, //number of days til a moderator has to pay again to stay the moderator -- if they don't pay, the moderator position opens up and anyone can pay to become the new moderator for the next N days
+                getPrivkeyFromBackupWords: ( backup_words, path, index ) => {
+                    //segwit path is 84'/0'/0'
+                    //taproot path is 86'/0'/0'
+                    var seed = bip39.mnemonicToSeedSync( backup_words );
+                    var node = bip32.fromSeed( seed );
+                    var path = "m/" + path + "/" + index;
+                    var root = node;
+                    var child = root.derivePath( path );
+                    return child.privateKey.toString( "hex" );
+                },
+                renderLoginChanges: () => {
+                    if ( shred_forums.privkey ) {
+                        $( '.login_btn' ).innerHTML = `Profile`;
+                        $( '.login_btn' ).onclick = () => showPage( "profile_page" );
+                        $( '.new_btn' ).classList.remove( "hidden" );
+                        $( '.thread_log_in' ).classList.add( "hidden" );
+                        $( '.thread_reply_div' ).classList.remove( "hidden" );
+                    } else {
+                        $( '.login_btn' ).innerHTML = `Log&nbsp;in`;
+                        $( `.login_btn` ).onclick = shred_forums.showLoginModal;
+                        $( '.new_btn' ).classList.add( "hidden" );
+                        $( '.thread_log_in' ).classList.remove( "hidden" );
+                        $( '.thread_reply_div' ).classList.add( "hidden" );
+                    }
+                },
+                showLoginModal: async () => {
+                    var html = `
+                        <p>Enter your backup words</p>
+                        <p><input class="backup_words"></p>
+                        <p><button class="submit_backup_words">Submit</button></p>
+                        <p>--- OR ---</p>
+                        <p><button class="new_account">Create account</button></p>
+                    `;
+                    showModal( html );
+                    $( `.submit_backup_words` ).onclick = () => {
+                        var backup_words = $( `.backup_words` ).value;
+                        shred_forums.login( backup_words );
+                    }
+                    $( `.new_account` ).onclick = () => {
+                        var backup_words = bip39.generateMnemonic();                    
+                        var html = `
+                            <p class="bold">Your backup words</p>
+                            <hr>
+                            <p>${backup_words}</p>
+                            <hr>
+                            <p>Store them securely, you will enter them whenever you want to log in</p>
+                            <p><button class="done_making_new_account">Done</button></p>
+                        `;
+                        showModal( html );
+                        $( `.done_making_new_account` ).onclick = () => {shred_forums.login( backup_words );}
+                    }
+                },
+                login: backup_words => {
+                    shred_forums.privkey = shred_forums.getPrivkeyFromBackupWords( backup_words, `44'/1237'/0'/0`, 0 );
+                    shred_forums.renderLoginChanges();
+                    modalVanish();
+                },
+                logout: () => {
+                    shred_forums.privkey = null;
+                    shred_forums.renderLoginChanges();
+                    modalVanish();
+                },
+                populateHomepage: async () => {
+                    var relay = shred_forums.relays[ 0 ];
+                    var ids = null;
+                    var authors = null;
+                    var kinds = [ 49150 ];
+                    var until = null;
+                    var since = 1751738865;
+                    var limit = 5;
+                    //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
+                    var etags = [ '0000000000000000000000000000000000000000000000000000746872656164' ];
+                    var events = await super_nostr.getEvents( relay, ids, authors, kinds, until, since, limit, etags );
+                    if ( !events.length ) $( '.all_topics' ).innerHTML = `None found`;
+                    events.forEach( event => shred_forums.events_to_display[ event.id ] = event );
+                },
+                getZapRequestFromZapReceipt: zap_receipt => {
+                    var i; for ( i=0; i<zap_receipt.tags.length; i++ ) {
+                        if ( zap_receipt.tags[ i ] && zap_receipt.tags[ i ][ 0 ] && zap_receipt.tags[ i ][ 1 ] && zap_receipt.tags[ i ][ 0 ] === "description" ) return JSON.parse( zap_receipt.tags[ i ][ 1 ] );
+                    }
+                },
+                getBolt11FromZapReceipt: zap_receipt => {
+                    var i; for ( i=0; i<zap_receipt.tags.length; i++ ) {
+                        if ( zap_receipt.tags[ i ] && zap_receipt.tags[ i ][ 0 ] && zap_receipt.tags[ i ][ 1 ] && zap_receipt.tags[ i ][ 0 ] === "bolt11" ) return zap_receipt.tags[ i ][ 1 ];
+                    }
+                },
+                getTitleFromNostrEvent: event => {
+                    var i; for ( i=0; i<event.tags.length; i++ ) {
+                        if ( event.tags[ i ] && event.tags[ i ][ 0 ] && event.tags[ i ][ 1 ] && event.tags[ i ][ 0 ] === "t" ) return event.tags[ i ][ 1 ];
+                    }
+                    if ( event.content.length > 30 ) return event.content.substring( 0, 30 ) + "...";
+                    return event.content;
+                },
+                getSubforumFromNostrEvent: event => {
+                    var i; for ( i=0; i<event.tags.length; i++ ) {
+                        if ( event.tags[ i ] && event.tags[ i ][ 0 ] && event.tags[ i ][ 1 ] && event.tags[ i ][ 0 ] === "n" ) return event.tags[ i ][ 1 ];
+                    }
+                },
+                getOTSFromNostrEvent: event => {
+                    var i; for ( i=0; i<event.tags.length; i++ ) {
+                        if ( event.tags[ i ] && event.tags[ i ][ 0 ] && event.tags[ i ][ 1 ] && event.tags[ i ][ 0 ] === "ots" ) return event.tags[ i ][ 1 ];
+                    }
+                },
+                stringIsAcceptable: string => !!string.match( /^[a-zA-Z0-9_]+$/ ),
+                createPost: async ( content, subforum, title, parent_nevent ) => {
+                    if ( !content || !subforum ) return alert( 'you forgot to write some content or a subforum' );
+                    if ( typeof content !== "string" || typeof subforum !== "string" ) return alert( 'must be strings' );
+                    if ( !shred_forums.stringIsAcceptable( subforum ) ) return alert( 'subforum must be alphanumeric, except for underscores' );
+                    if ( subforum.length >= 15 ) return alert( 'subforum must less than 15 characters' );
+                    if ( title && !( typeof title === "string" && title.length < 60 ) ) return alert( 'title must be a string of less than 60 characters' );
+                    if ( !shred_forums.privkey ) return alert( 'you must log in' );
+                    var privkey = shred_forums.privkey;
+                    var pubkey = super_nostr.getPubkey( privkey );
+                    var parent_pubkey = null;
+                    var parent_relays = null;
+                    if ( !parent_nevent ) {
+                        //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
+                        var tags = [ [ "e", "0000000000000000000000000000000000000000000000000000746872656164" ], [ "n", subforum ] ];
+                    } else {
+                        //00000000000000000000000000000000000000000000000000636f6d6d656e74 means "comment"
+                        var [ parent_pubkey, parent_relays ] = shred_forums.convertNEvent( parent_nevent );
+                        var tags = [ [ "e", parent_pubkey, parent_relays[ 0 ] ], [ "e", "00000000000000000000000000000000000000000000000000636f6d6d656e74" ] ];
+                    }
+                    if ( title ) tags.push( [ "t", title ] );
+                    var now = Math.floor( Date.now() / 1000 );
+                    var data_for_ots = JSON.stringify([
+                        0,
+                        pubkey,
+                        now,
+                        49150,
+                        tags,
+                        content,
+                    ]);
+                    var hexified = shred_forums.textToHex( data_for_ots );
+                    var file = Buffer.from( hexified, 'hex' );
+                    var detached = OpenTimestamps.DetachedTimestampFile.fromBytes( new OpenTimestamps.Ops.OpSHA256(), file );
+                    await OpenTimestamps.stamp( detached );
+                    var ots_attestation_bytes = detached.serializeToBytes();
+                    var ots_attestation_hex = Buffer.from( ots_attestation_bytes ).toString( "hex" );
+                    tags.push( [ 'ots', ots_attestation_hex ] );
+                    var event = await super_nostr.prepEvent( privkey, content, 49150, tags, now );
+                    if ( typeof event !== "object" ) return alert( `unknown error, please try again` );
+                    if ( !parent_relays ) super_nostr.sendEvent( event, shred_forums.relays[ 0 ] );
+                    else super_nostr.sendEvent( event, parent_relays[ 0 ] );
+                    console.log( 'post successful' );
+                },
+                convertHMS: value => {
+                    if ( value < 0 ) value = 0;
+                    var sec = parseInt(value, 10); // convert value to number if it's string
+                    var years = Math.floor(sec / 31536000); // get years
+                    var months = Math.floor((sec - (years * 31536000)) / 2592000); // get months
+                    var days = Math.floor((sec - (years * 31536000) - (months * 2592000)) / 86400); // get days
+                    var hours = Math.floor((sec - (years * 31536000) - (months * 2592000) - (days * 86400)) / 3600); // get hours
+                    var minutes = Math.floor((sec - (years * 31536000) - (months * 2592000) - (days * 86400) - (hours * 3600)) / 60); // get minutes
+                    var seconds = sec - (years * 31536000) - (months * 2592000) - (days * 86400) - (hours * 3600) - (minutes * 60); //  get seconds
+                    var yearsstring = (years != 1) ? `years`:`year`;
+                    var monthsstring = (months != 1) ?  `months`:`month`;
+                    var daysstring = (days != 1) ? `days`:`day`;
+                    var hoursstring = (hours != 1) ? `hours`:`hour`;
+                    var minutesstring = (minutes != 1) ? `minutes`:`minute`;
+                    var secondsstring = (seconds != 1) ? `seconds`:`second`;
+                    if ( years > 0 ) return `${years} ${yearsstring} ago`;
+                    if ( months > 0 ) return `${months} ${monthsstring} ago`;
+                    if ( days > 0 ) return `${days} ${daysstring} ago`;
+                    if ( hours > 0 ) return `${hours} ${hoursstring} ago`;
+                    if ( minutes > 0 ) return `${minutes} ${minutesstring} ago`;
+                    if ( seconds == 0 ) return `${seconds} seconds ago`;
+                    return `${seconds} ${secondsstring} ago`;
+                },
+                convertNEvent: nevent => {
+                    var arr = bech32.bech32.fromWords( bech32.bech32.decode( nevent, 100_000 ).words );
+                    var hex = super_nostr.bytesToHex( arr );
+                    if ( !hex.startsWith( "0020" ) ) var event_id = hex.substring( hex.length - 64 );
+                    else var event_id = hex.substring( 4, 68 );
+                    if ( !hex.startsWith( "0020" ) ) hex = hex.substring( 0, hex.length - 64 );
+                    else hex = hex.substring( 68 );
+                    var relays = [];
+                    var loop = () => {
+                        if ( hex.startsWith( "01" ) ) {
+                            var relay_length = parseInt( hex.substring( 2, 4 ), 16 );
+                            relays.push( shred_forums.hexToText( hex.substring( 4, 4 + relay_length * 2 ) ) );
+                            hex = hex.substring( 4 + relay_length * 2 );
+                            loop();
+                        }
+                    }
+                    loop();
+                    return [ event_id, relays ];
+                },
+                convertPubkeyAndRelaysToNprofile: ( prefix, pubkey, relays ) => {
+                    var relays_str = "";
+                    relays.forEach( relay => {
+                        var relay_str = shred_forums.textToHex( relay );
+                        var len = ( relay_str.length / 2 ).toString( 16 );
+                        if ( len.length % 2 ) len = "0" + len;
+                        relays_str = relays_str + "01" + len + relay_str;
+                    });
+                    var hex = relays_str + "0020" + pubkey;
+                    var bytes = super_nostr.hexToBytes( hex );
+                    var nevent = bech32.bech32.encode( prefix, bech32.bech32.toWords( bytes ), 100_000 );
+                    return nevent;
+                },
+                hexToText: hex => {
+                    var bytes = new Uint8Array( Math.ceil( hex.length / 2 ) );
+                    var i; for ( i=0; i<hex.length; i++ ) bytes[ i ] = parseInt( hex.substr( i * 2, 2 ), 16 );
+                    var text = new TextDecoder().decode( bytes );
+                    return text;
+                },
+                textToHex: text => {
+                    var encoded = new TextEncoder().encode( text );
+                    return Array.from( encoded )
+                        .map( x => x.toString( 16 ).padStart( 2, "0" ) )
+                        .join( "" );
+                },
+                pubkeyFromNpub: npub => super_nostr.bytesToHex( bech32.bech32.fromWords( bech32.bech32.decode( npub ).words ) ),
+                hexToBase64: hex => btoa( hex.match( /\w{2}/g ).map( a => String.fromCharCode( parseInt( a, 16 ) ) ).join( "" ) ),
+                base64ToHex: str => {
+                    var raw = atob( str );
+                    var result = '';
+                    var i; for ( i=0; i<raw.length; i++ ) {
+                        var hex = raw.charCodeAt( i ).toString( 16 );
+                        result += hex.length % 2 ? '0' + hex : hex;
+                    }
+                    return result.toLowerCase();
+                },
+                finishAuth: async ( main_pubkey, main_relays ) => {
+                    var nprofile = shred_forums.convertPubkeyAndRelaysToNprofile( "nprofile", main_pubkey, main_relays );
+                    var auth_privkey = await super_nostr.sha256( super_nostr.hexToBytes( shred_forums.privkey ) );
+                    var auth_pubkey = super_nostr.getPubkey( auth_privkey );
+                    var kind_10050_event = await super_nostr.prepEvent( auth_privkey, "", 10050, [ [ "relay", main_relays[ 0 ] ] ] );
+                    super_nostr.sendEvent( kind_10050_event, main_relays[ 0 ] );
+                    super_nostr.sendEvent( kind_10050_event, "wss://relay.damus.io" );
+                    super_nostr.sendEvent( kind_10050_event, "wss://nostrue.com" );
+                    super_nostr.sendEvent( kind_10050_event, "wss://relay.snort.social/" );
+                    super_nostr.sendEvent( kind_10050_event, "wss://nostr.mom/" );
+                    super_nostr.sendEvent( kind_10050_event, "wss://nostr-pub.wellorder.net/" );
+                    super_nostr.sendEvent( kind_10050_event, "wss://nos.lol/" );
+                    var subkey_pubkey = super_nostr.getPubkey( shred_forums.privkey );
+                    var proof_of_ownership = await nobleSecp256k1.schnorr.sign( subkey_pubkey, shred_forums.privkey );
+                    var html = `
+                        <p>The following string is a Proof of Ownership. Use your main nostr account to DM it back to us; note that you MUST use kind04 "legacy" DMs because nip17 DMs are unreliable. Your nostr DMs should have a message for you to reply to. Reply with this Proof of Ownership and nothing else.</p>
+                        <p class="proof_of_ownership">${shred_forums.hexToBase64( proof_of_ownership )}</p>
+                        <p>Listening for the DM...</p>
+                    `;
+                    showModal( html );
+                    await super_nostr.waitSomeSeconds( 1 );
+                    var msg = `This is your Shred Forums account. Reply to this message with your Proof of Ownership and nothing else. If you did not expect this message, ignore it.`;
+                    var dm_event = await shred_forums.prepKind17dm( msg, auth_privkey, main_pubkey, main_relays );
+                    super_nostr.sendEvent( dm_event, main_relays[ 0 ] );
+                    var loop = async () => {
+                        var events = await super_nostr.getEvents( main_relays[ 0 ], null, null, [ 1059 ], null, Math.floor( Date.now() / 1000 ) - ( 86400 * 10 ), 1, null, [ auth_pubkey ] );
+                        if ( events.length ) return events[ 0 ];
+                        await super_nostr.waitSomeSeconds( 3 );
+                        return loop();
+                    }
+                    var reply = await loop();
+                    var conversation_key_1 = nip44.utils.getConversationKey( auth_privkey, reply.pubkey );
+                    var seal = JSON.parse( nip44.decrypt( reply.content, conversation_key_1 ) );
+                    var conversation_key_2 = nip44.utils.getConversationKey( auth_privkey, seal.pubkey );
+                    var d_event = JSON.parse( nip44.decrypt( seal.content, conversation_key_2 ) );
+                    if ( seal.pubkey !== d_event.pubkey ) throw( 'error decrypting content -- someone used impersonation' );
+                    var sig = shred_forums.base64ToHex( d_event.content );
+                    var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, subkey_pubkey, subkey_pubkey );
+                    if ( !sig_is_valid ) throw( 'user did not authenticate properly, the Proof of Ownership they sent was invalid' );
+                    var content_to_publish = { auth_privkey, owner: nprofile, proof_of_ownership: seal }
+                    var profile_event = await super_nostr.prepEvent( shred_forums.privkey, JSON.stringify( content_to_publish ), 0 );
+                    var i; for ( i=0; i<main_relays.length; i++ ) super_nostr.sendEvent( profile_event, main_relays[ i ] );
+                    super_nostr.sendEvent( profile_event, shred_forums.relays[ 0 ] );
+                    super_nostr.sendEvent( profile_event, "wss://relay.damus.io" );
+                    super_nostr.sendEvent( profile_event, "wss://nostrue.com" );
+                    super_nostr.sendEvent( profile_event, "wss://relay.snort.social/" );
+                    super_nostr.sendEvent( profile_event, "wss://nostr.mom/" );
+                    super_nostr.sendEvent( profile_event, "wss://nostr-pub.wellorder.net/" );
+                    super_nostr.sendEvent( profile_event, "wss://nos.lol/" );
+                    showModal( `<p>You have successfully linked your account to nostr` );
+                },
+                prepKind17dm: async ( msg, sender_privkey, recipient_pubkey, recipient_relays ) => {
+                    var rumor = await super_nostr.prepEvent( sender_privkey, msg, 14, [ [ "p", recipient_pubkey, recipient_relays[ 0 ] ] ] );
+                    delete rumor.sig;
+                    var conversation_key_1 = nip44.utils.getConversationKey( sender_privkey, recipient_pubkey );
+                    var encrypted_rumor = nip44.encrypt( JSON.stringify( rumor ), conversation_key_1 );
+                    var kind_13_event = await super_nostr.prepEvent( sender_privkey, encrypted_rumor, 13 );
+                    var random_privkey = super_nostr.getPrivkey();
+                    var conversation_key_2 = nip44.utils.getConversationKey( random_privkey, recipient_pubkey );
+                    var encrypted_kind_13_event = nip44.encrypt( JSON.stringify( kind_13_event ), conversation_key_2 );
+                    var kind_1059_event = await super_nostr.prepEvent( random_privkey, encrypted_kind_13_event, 1059, [ [ "p", recipient_pubkey, recipient_relays[ 0 ] ] ] );
+                    return kind_1059_event;
+                },
+                loadProfiles: async () => {
+                    Object.keys( shred_forums.profiles ).forEach( profile => {
+                        $$( `[ data-userpub="${profile}" ]` ).forEach( div => {
+                            if ( shred_forums.profiles[ profile ].hide_posts_by_this_user ) div.classList.add( "hidden" );
+                            div.getElementsByClassName( "author_pic" )[ 0 ].style.backgroundImage = `url( '${shred_forums.profiles[ profile ].pic}' )`;
+                            div.getElementsByClassName( "author_nym" )[ 0 ].innerText = shred_forums.profiles[ profile ].nym;
+                        });
+                    });
+                    await super_nostr.waitSomeSeconds( 1 );
+                    shred_forums.loadProfiles();
+                },
+                loadProfile: async event => {
+                    //check if the user has a profile, and if they do, load it
+                    //do not try to load the user's profile if that is marked as already attempted
+                    if ( !shred_forums.profiles[ event.pubkey ].try_to_load ) return;
+                    shred_forums.profiles[ event.pubkey ].try_to_load = false;
+
+                    //load the profile event of the user's subkey
+                    console.log( 'getting profile info step 1' );
+                    var sub_profile_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ event.pubkey ], [ 0 ] );
+                    if ( !sub_profile_events.length ) return console.log( 'no profile info' );
+
+                    //check if their subkey claims to have a parent
+                    var profile_accessors = JSON.parse( sub_profile_events[ 0 ].content );
+
+                    //assume the claimed ownerership profile is valid and display it -- it will disappear if it is not valid
+                    console.log( 'getting profile info step 2' );
+                    var owner_nprofile = profile_accessors[ "owner" ];
+                    var [ owner_pubkey, owner_relays ] = shred_forums.convertNEvent( owner_nprofile );
+                    var owner_profile_events = await super_nostr.getEvents( owner_relays[ 0 ], null, [ owner_pubkey ], [ 0 ] );
+                    var owner_profile_data = JSON.parse( owner_profile_events[ 0 ].content )
+                    console.log( 'displaying the loaded profile' );
+                    shred_forums.profiles[ event.pubkey ].pic = owner_profile_data.picture;
+                    shred_forums.profiles[ event.pubkey ].nym = owner_profile_data.display_name;
+
+                    //validate the proof
+                    var proof_of_ownership = profile_accessors[ "proof_of_ownership" ];
+                    var auth_privkey = profile_accessors[ "auth_privkey" ];
+                    var conversation_key = nip44.utils.getConversationKey( auth_privkey, proof_of_ownership.pubkey );
+                    var d_event = JSON.parse( nip44.decrypt( proof_of_ownership.content, conversation_key ) );
+                    if ( proof_of_ownership.pubkey !== d_event.pubkey ) throw( 'user did not authenticate properly, their pubkey does not match' );
+                    var sig = shred_forums.base64ToHex( d_event.content );
+                    var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, event.pubkey, event.pubkey );
+                    if ( !sig_is_valid ) throw( 'user did not authenticate properly, the Proof of Ownership they sent was invalid' );
+                },
+                prepareToDisplayEvents: async page_to_display_events_on => {
+                    var events = Object.keys( shred_forums.events_to_display );
+                    events.forEach( ( event_id, index ) => {
+                        if ( shred_forums.events_displayed.includes( event_id ) ) return;
+                        var event = shred_forums.events_to_display[ event_id ];
+                        if ( !event ) return;
+                        shred_forums.events_displayed.push( event.id );
+                        var div = document.createElement( "div" );
+                        if ( page_to_display_events_on === 'home_page' ) {
+                            if ( $( '.all_topics' ).innerText === 'loading...' ) $( '.all_topics' ).innerHTML = ``;
+                            div.classList.add( "thread_summary" );
+                            div.innerHTML = `
+                                <div class="thread_title"></div>
+                                <div class="thread_snippet"></div>
+                                <div class="thread_meta">
+                                    <div class="pic_and_nym">
+                                        <div class="author_pic"></div>
+                                        <div class="author_nym"></div>
+                                    </div>
+                                    <div class="thread_timestamp"></div>
+                                    <div class="thread_subforum bold"></div>
+                                </div>
+                            `;
+                            var title = shred_forums.getTitleFromNostrEvent( event );
+                            var subforum = shred_forums.getSubforumFromNostrEvent( event );
+                            div.getElementsByClassName( "thread_title" )[ 0 ].innerText = title;
+                            div.getElementsByClassName( "thread_snippet" )[ 0 ].innerText = event.content.length > 90 ? event.content.substring( 0, 90 ) + "..." : event.content;
+                        }
+                        if ( page_to_display_events_on === 'thread_page' ) {
+                            var op_nevent = params.t;
+                            var [ op_event_id ] = shred_forums.convertNEvent( op_nevent );
+                            div.classList.add( "thread_comment" );
+                            div.innerHTML = `
+                                <div class="comment_meta">
+                                    <div class="pic_and_nym">
+                                        <div class="author_pic"></div>
+                                        <div class="author_nym"></div>
+                                    </div>
+                                    <div class="comment_timestamp"></div>
+                                </div>
+                                <div class="comment_content"></div>
+                            `;
+                            div.getElementsByClassName( "comment_content" )[ 0 ].innerText = event.content;
+                        }
+                        if ( !shred_forums.profiles.hasOwnProperty( event.pubkey ) ) shred_forums.profiles[ event.pubkey ] = {
+                            hide_posts_by_this_user: false,
+                            try_to_load: true,
+                            nym: event.pubkey.substring( 0, 4 ) + "..." + event.pubkey.substring( event.pubkey.length - 4 ),
+                            pic: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Default_pfp.svg/480px-Default_pfp.svg.png',
+                        }
+                        div.getElementsByClassName( "author_pic" )[ 0 ].style.backgroundImage = `url( '${shred_forums.profiles[ event.pubkey ].pic}' )`;
+                        div.getElementsByClassName( "author_nym" )[ 0 ].innerText = shred_forums.profiles[ event.pubkey ].nym;
+                        var how_long_ago = shred_forums.convertHMS( Math.floor( Date.now() / 1000 ) - event.created_at );
+                        if ( page_to_display_events_on === 'thread_page' ) {
+                            div.getElementsByClassName( "comment_timestamp" )[ 0 ].innerHTML = `&bull; &nbsp;${how_long_ago}`;
+                            console.log( 'displaying thread' );
+                            $( '.thread_comments' ).append( div );
+                        }
+                        if ( page_to_display_events_on === 'home_page' ) {
+                            how_long_ago = how_long_ago + " in";
+                            div.getElementsByClassName( "thread_timestamp" )[ 0 ].innerText = how_long_ago;
+                            div.getElementsByClassName( "thread_subforum" )[ 0 ].innerText = subforum;
+                            div.onclick = e => {
+                                var target = e.target;
+                                if (
+                                    target.classList.contains( "pic_and_nym" ) ||
+                                    target.classList.contains( "author_nym" ) ||
+                                    target.classList.contains( "author_pic" )
+                                    ) {
+                                    var loop = target2 => {
+                                        if ( target2.classList.contains( "thread_summary" ) ) return target2;
+                                        target2 = target2.parentElement;
+                                        return loop( target2 );
+                                    }
+                                    target2 = loop( target );
+                                    var user = target2.getAttribute( "data-userpub" );
+                                    console.log( 'visit this user:', user );
+                                    return;
+                                }
+                                if ( target.classList.contains( "thread_subforum" ) ) {
+                                    console.log( 'visit this subforum:', e.target.innerText );
+                                    return;
+                                }
+                                var loop = target => {
+                                    if ( target.classList.contains( "thread_summary" ) ) return target;
+                                    target = target.parentElement;
+                                    return loop( target );
+                                }
+                                target = loop( target );
+                                var event_id = target.getAttribute( "data-event_id" );
+                                var nevent = shred_forums.convertPubkeyAndRelaysToNprofile( "nevent", event_id, shred_forums.relays );
+                                var url = window.location.protocol + "//" + window.location.hostname + window.location.pathname + `#t=${nevent}`;
+                                window.location.href = url;
+                                window.location.reload();
+                            }
+                            $( '.all_topics' ).append( div );
+                        }
+                        div.setAttribute( "data-userpub", event.pubkey );
+                        div.setAttribute( "data-event_id", event.id );
+
+                        setTimeout( async() => {
+                            //validate the post, and make it disappear if it does not validate
+                            // when validating a post, validators load the relevant proof_of_zap -- POZ -- by searching for events by the post-maker that reference the fake event '0000000000000000000000000000000000000000007a617020747261636b6572' ('zap tracker' turned into hex and padded to 32 bytes) -- and they use the "until" option to exclude POZs created after the post they are investigating. The result is thus the post-maker's latest POZ from before the relevant post. Then they check how many posts the post-maker created after that POZ and until the relevant post, and show the post if the number of posts created in that interval is 30 or fewer
+                            // load proof_of_zap from monthly tracker
+                            console.log( 'loading proof of zap' );
+                            var all_user_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ event.pubkey ] );
+                            var latest_zap_tracker_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ event.pubkey ], null, null, null, 1, [ '0000000000000000000000000000000000000000007a617020747261636b6572' ] );
+                            if ( !latest_zap_tracker_events.length ) {
+                                console.log( 'the user has no zap trackers' );
+                                shred_forums.profiles[ event.pubkey ].hide_posts_by_this_user = true;
+                                return;
+                            }
+                            var latest_zap_tracker = latest_zap_tracker_events[ 0 ];
+                            try {
+                                var proof_of_zaps = JSON.parse( latest_zap_tracker.content );
+                                var time_of_latest_proof_of_zap = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zap_receipt" ].created_at;
+                                var posts_since_latest_zap_tracker = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ event.pubkey ], [ 49150 ], time_of_latest_proof_of_zap - 5, null, 31 );
+                                if ( posts_since_latest_zap_tracker.length > 30 ) throw( 'user posted without a corresponding proof_of_zap' );
+                                //validate latest proof of zap
+                                var zapper_sig = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zapper_sig" ];
+                                var zap_receipt = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zap_receipt" ];
+                                //validate the zapper sig
+                                var zapper_pubkey = shred_forums.getZapRequestFromZapReceipt( zap_receipt ).pubkey;
+                                var sig_is_valid = await nobleSecp256k1.schnorr.verify( zapper_sig, event.pubkey, zapper_pubkey );
+                                if ( !sig_is_valid ) throw( 'user provided invalid proof due to showing invalid signature' );
+                                //check if the POZ was produced by the pubkey given in the lnurl of the intended recipient
+                                var zapgate = shred_forums.zapgate.split( "@" );
+                                var expected_zap_receipt_maker_data = await fetch( `https://${zapgate[ 1 ]}/.well-known/lnurlp/${zapgate[ 0 ]}` );
+                                expected_zap_receipt_maker_data = await expected_zap_receipt_maker_data.json();
+                                var expected_zap_receipt_maker = expected_zap_receipt_maker_data[ "nostrPubkey" ];
+                                var real_zap_receipt_maker = zap_receipt.pubkey;
+                                if ( real_zap_receipt_maker !== expected_zap_receipt_maker ) throw( 'user provided invalid proof due to paying wrong person' );
+                                //check if the bolt11 is for the right amount of sats or more
+                                var original_invoice = shred_forums.getBolt11FromZapReceipt( zap_receipt );
+                                if ( !bolt11.decode( original_invoice ).hasOwnProperty( "millisatoshis" ) ) throw( 'user provided invalid proof due to requesting amountless invoice' );
+                                var original_invoice_amt = Number( bolt11.decode( original_invoice ).millisatoshis ) / 1000;
+                                if ( original_invoice_amt < shred_forums.zapgate_amt_to_post ) throw( 'user provided invalid proof due to paying wrong amount' );
+                                //check if the user made 30 or fewer posts between the time this POZ was created and the time when the post being validated was created
+                                var timestamp_of_zap_receipt = zap_receipt.created_at;
+                                var timestamp_of_post = event.created_at;
+                                var posts_created_during_interval = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ event.pubkey ], [ 49150 ], timestamp_of_zap_receipt - 1, timestamp_of_post + 1, 31 );
+                                if ( posts_created_during_interval.length > 30 ) throw( 'user provided invalid proof due to at least one unpaid post' );
+                            } catch ( e ) {
+                                console.log( e );
+                                shred_forums.profiles[ event.pubkey ].hide_posts_by_this_user = true;
+                                return;
+                            }
+                        });
+
+                        setTimeout( async() => {
+                            try {
+                                //check for an OTS attestation
+                                var ots_attestation = shred_forums.getOTSFromNostrEvent( event );
+                                if ( !ots_attestation ) throw( 'post does not include ots attestation' );
+
+                                //skip further validation if the post is younger than 2 days old
+                                var now = Math.floor( Date.now() / 1000 );
+                                if ( now - event.created_at < ( 86400 * 2 ) ) return console.log( 'event is younger than 2 days old' );
+
+                                //validate the OTS attestation
+                                var original_file_data = [
+                                    0,
+                                    event.pubkey,
+                                    event.created_at,
+                                    49150,
+                                    event.tags,
+                                    event.content,
+                                ];
+                                //remove the OTS attestation itself from the tags because it
+                                //was not included when sending the file to the OTS servers
+                                //originally
+                                original_file_data[ 4 ].pop();
+                                original_file_data = JSON.stringify( original_file_data );
+                                var hexified = shred_forums.textToHex( original_file_data );
+                                var file = Buffer.from( hexified, 'hex' );
+                                var fileOts = Buffer.from( ots_attestation, 'hex' );
+                                var detached = OpenTimestamps.DetachedTimestampFile.fromBytes( new OpenTimestamps.Ops.OpSHA256(), file );
+                                var detachedOts = OpenTimestamps.DetachedTimestampFile.deserialize( fileOts );
+                                var options = {};
+                                options.ignoreBitcoinNode = true;
+                                options.timeout = 5000;
+                                var ots_timestamp = undefined;
+                                var result = await OpenTimestamps.verify( detachedOts, detached, options );
+                                if ( JSON.stringify( result ) === "{}" ) throw( 'cannot validate proof' );
+                                if ( result.hasOwnProperty( "bitcoin" ) && result.bitcoin.hasOwnProperty( "timestamp" ) ) ots_timestamp = result.bitcoin.timestamp;
+                                if ( Math.abs( event.created_at - ots_timestamp ) > ( 86400 * 2 ) ) throw( 'OTS timestamp is too far off from event timestamp' );
+                            } catch ( e ) {
+                                console.log( e );
+                                shred_forums.profiles[ event.pubkey ].hide_posts_by_this_user = true;
+                                return;
+                            }
+                        });
+                        shred_forums.loadProfile( event );
+                    });
+                    await super_nostr.waitSomeSeconds( 5 );
+                    shred_forums.prepareToDisplayEvents( page_to_display_events_on );
+                },
+            }
+            shred_forums.renderLoginChanges();
+            $( `.site_name` ).onclick = () => {
+                var url = window.location.protocol + "//" + window.location.hostname + window.location.pathname;
+                if ( url.endsWith( "//" ) ) url = url.substring( 0, url.length - 1 );
+                window.location.href = url;
+            }
+            $( `.log_out_btn` ).onclick = shred_forums.logout;
+            $( `.new_btn` ).onclick = async () => {
+                var html = `
+                    <p><button class="new_thread">New thread</button></p>
+                    <p><button class="new_post">New post</button></p>
+                `;
+                showModal( html );
+                $( '.new_thread' ).onclick = () => {
+                    showPage( "new_thread_page" );
+                    modalVanish();
+                }
+            }
+            $( `.submit_new_thread` ).onclick = async () => {
+                var title = $( '.new_thread_page .thread_title' ).value;
+                var content = $( '.new_thread_page .thread_content' ).value;
+                var subforum = $( '.new_thread_page .thread_subforum' ).value;
+                //only post a proof of zap if user needs one; to find out if they need one, get the user's last zap tracker and ensure the number of posts they made since their last proof of zap is less than 31
+                //get the user's latest zap tracker
+                var main_pubkey = super_nostr.getPubkey( shred_forums.privkey );
+                var latest_zap_tracker_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ main_pubkey ], null, null, null, 1, [ '0000000000000000000000000000000000000000007a617020747261636b6572' ] );
+                var latest_zap_tracker = null;
+                if ( latest_zap_tracker_events.length ) latest_zap_tracker = latest_zap_tracker_events[ 0 ];
+                var user_needs_proof_of_zap = false;
+                if ( !latest_zap_tracker ) user_needs_proof_of_zap = true;
+                else {
+                    //ensure the number of posts they made since their last proof of zap is less than 31
+                    var proof_of_zaps = JSON.parse( latest_zap_tracker.content );
+                    var time_of_latest_proof_of_zap = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zap_receipt" ].created_at;
+                    var posts_since_latest_zap_tracker = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ main_pubkey ], [ 49150 ], time_of_latest_proof_of_zap - 5, null, 31 );
+                    if ( posts_since_latest_zap_tracker.length > 30 ) user_needs_proof_of_zap = true;
+                }
+                if ( user_needs_proof_of_zap ) {
+                    var [ invoice, checking_id, zapper_privkey ] = await nwcjs.getZapRequest( shred_forums.zapgate, shred_forums.zapgate_amt_to_post );
+                    console.log( 'pay this invoice:', invoice );
+                    var loop = async () => {
+                        var receipt = await nwcjs.checkZapStatus( invoice, checking_id );
+                        if ( receipt !== "not paid yet" ) return receipt;
+                        console.log( 'not paid yet' );
+                        await super_nostr.waitSomeSeconds( 3 );
+                        return loop();
+                    }
+                    var zap_receipt = await loop();
+                    console.log( 'paid' );
+                    console.log( 'preparing zap tracker' );
+                    var zapper_sig = await nobleSecp256k1.schnorr.sign( main_pubkey, zapper_privkey );
+                    //each user should post a proof_of_zap -- POZ -- in a tracker for corresponding to the month wherein he created that POZ. How to make the monthly tracker? Have the user put their first tracker in a post of kind 11000, and, given that a person is only expected to live for 840 months, have them increment the kind number for every subsequent month -- because they won't run out in their lifetime. Whenever they make a new tracker, ensure it references the following fake event: '0000000000000000000000000000000000000000007a617020747261636b6572' ('zap tracker' turned into hex and padded to 32 bytes). When validating a post, validators search for the post-maker's most recent POZ before that post by searching for events that reference that fake event (and use the "until" option to exclude POZs created after the post they are investigating), which is thus the post-maker's latest POZ from before the relevant post. Then they check how many posts they created after that POZ and until the relevant post, and show the post if the number of posts created in that interval is 30 or fewer
+                    var zaps_tracker = [
+                        {zapper_sig, zap_receipt}
+                    ];
+                    //get the timestamp of the original zap tracker -- the user's kind 11000 event -- then find out how many 30-day-periods to add on to get to today, then add that many 30-day-periods to 11000, then change the tracker_kind_number to the result; if the user has not yet made a kind 11000 event, then make the tracker_kind_number 11000
+                    var first_tracker_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ main_pubkey ], [ 11000 ] );
+                    var first_tracker_event = null;
+                    if ( first_tracker_events.length ) first_tracker_event = first_tracker_events[ 0 ];
+                    var tracker_kind_number = 11000;
+                    if ( first_tracker_event ) {
+                        var time_of_first_tracker_event = first_tracker_event.created_at;
+                        var now = Math.floor( Date.now() / 1000 );
+                        var time_since_first_tracker_event = now - time_of_first_tracker_event;
+                        var days_since_first_tracker_event = time_since_first_tracker_event / 86400;
+                        var thirty_day_periods_since_first_tracker_event = Math.floor( days_since_first_tracker_event / 30 );
+                        tracker_kind_number = tracker_kind_number + thirty_day_periods_since_first_tracker_event;
+                    }
+                    console.log( 'zap tracker prepared, posting now' );
+                    var tracker_event = await super_nostr.prepEvent( shred_forums.privkey, JSON.stringify( zaps_tracker ), tracker_kind_number, [ [ 'e', '0000000000000000000000000000000000000000007a617020747261636b6572' ] ] );
+                    super_nostr.sendEvent( tracker_event, shred_forums.relays[ 0 ] );
+                    console.log( 'zap tracker posted' );
+                }
+                shred_forums.createPost( content, subforum, title );
+                console.log( 'thread created' );
+            }
+            $( '.auth_with_nostr' ).onclick = async () => {
+                var html = `
+                    <p>Enter your main nostr nprofile</p>
+                    <p><input class="nostr_nprofile" placeholder="nprofile123xyz..."></p>
+                    <p><button class="submit_nprofile">Submit</button></p>
+                `;
+                showModal( html );
+                $( '.submit_nprofile' ).onclick = async () => {
+                    var main_pubkey = null;
+                    var main_relays = [];
+                    var nprofile = $( '.nostr_nprofile' ).value;
+                    var html = `
+                        <p>Enter a relay you use</p>
+                        <p><input class="nostr_relay" placeholder="wss://relay.da..."></p>
+                        <p><button class="submit_relay">Submit</button></p>
+                    `;
+                    showModal( html );
+                    $( '.submit_relay' ).onclick = async () => {
+                        main_pubkey = shred_forums.pubkeyFromNpub( nprofile );
+                        main_relays.push( $( '.nostr_relay' ).value );
+                        shred_forums.finishAuth( main_pubkey, main_relays );
+                    }
+                    if ( nprofile.startsWith( "nprofile" ) ) {
+                        modalVanish();
+                        var [ main_pubkey, main_relays ] = shred_forums.convertNEvent( nprofile );
+                        shred_forums.finishAuth( main_pubkey, main_relays );
+                    } else {
+                        if ( !nprofile.startsWith( "npub" ) ) {
+                            modalVanish();
+                            return alert( 'your nprofile was invalid because it did not start with nprofile, please try again' );
+                        }
+                    }
+                }
+            }
+            $( `.thread_log_in` ).onclick = shred_forums.showLoginModal;
+                var reply = $( `.thread_reply_box` ).value = "";
+            $( `.submit_thread_reply` ).onclick = async () => {
+                var reply = $( `.thread_reply_box` ).value;
+                var parent_nevent = params.t;
+                shred_forums.createPost( reply, "_", null, parent_nevent );
+            }
+            var showPage = page => {
+                $( '.home_page' ).classList.add( "hidden" );
+                $( '.profile_page' ).classList.add( "hidden" );
+                $( '.new_thread_page' ).classList.add( "hidden" );
+                $( '.thread_page' ).classList.add( "hidden" );
+                $( `.${page}` ).classList.remove( "hidden" );
+            }
+            window.onload = async () => {
+                if ( !window.location.href.includes( "#" ) ) shred_forums.populateHomepage();
+                var page_to_display_events_on = 'home_page';
+                if ( params.hasOwnProperty( "t" ) ) page_to_display_events_on = 'thread_page';
+                shred_forums.prepareToDisplayEvents( page_to_display_events_on );
+                // if on thread page, load thread
+                if ( window.location.href.includes( "#t=" ) ) {
+                    var thread_nevent = params.t;
+                    var [ event_id, relays ] = shred_forums.convertNEvent( thread_nevent );
+                    showPage( 'thread_page' );
+                    var relay = relays[ 0 ];
+                    var ids = [ event_id ];
+                    var events = await super_nostr.getEvents( relay, ids );
+                    var event = events[ 0 ];
+                    if ( !event ) return alert( 'error loading thread, please reload page' );
+                    var title = shred_forums.getTitleFromNostrEvent( event );
+                    var subforum = shred_forums.getSubforumFromNostrEvent( event );
+                    $( '.thread_page .thread_title' ).innerText = title;
+                    $( '.thread_page .thread_content' ).innerText = event.content;
+                    if ( !shred_forums.profiles.hasOwnProperty( event.pubkey ) ) shred_forums.profiles[ event.pubkey ] = {
+                        hide_posts_by_this_user: false,
+                        try_to_load: true,
+                        nym: event.pubkey.substring( 0, 4 ) + "..." + event.pubkey.substring( event.pubkey.length - 4 ),
+                        pic: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Default_pfp.svg/480px-Default_pfp.svg.png',
+                    }
+                    shred_forums.loadProfile( event );
+                    $( '.thread_page .author_pic' ).style.backgroundImage = `url( '${shred_forums.profiles[ event.pubkey ].pic}' )`;
+                    $( '.thread_page .author_nym' ).innerText = shred_forums.profiles[ event.pubkey ].nym;
+                    var how_long_ago = shred_forums.convertHMS( Math.floor( Date.now() / 1000 ) - event.created_at ) + " in";
+                    $( '.thread_page .thread_timestamp' ).innerText = how_long_ago;
+                    $( '.thread_page .thread_subforum' ).innerText = subforum;
+                    $( '.thread_page .thread_meta' ).setAttribute( "data-userpub", event.pubkey );
+                    $( '.thread_page .thread_title' ).setAttribute( "data-event_id", event.id );
+                    var relay = relays[ 0 ];
+                    var ids = null;
+                    var authors = null;
+                    var kinds = [ 49150 ];
+                    var until = null;
+                    var since = null;
+                    var limit = null;
+                    //00000000000000000000000000000000000000000000000000636f6d6d656e74 is "comment" turned into hex and padded to 32 bytes
+                    var etags = [ '00000000000000000000000000000000000000000000000000636f6d6d656e74', event_id ];
+                    var events = await super_nostr.getEvents( relay, ids, authors, kinds, until, since, limit, etags );
+                    if ( !events.length ) $( '.all_topics' ).innerHTML = `None found`;
+                    events.forEach( event => shred_forums.events_to_display[ event.id ] = event );
+                }
+                shred_forums.loadProfiles();
+                nwcjs.getZapRequest = async ( lnaddy, amount, relays = shred_forums.relays ) => {
+                    amount = amount * 1000;
+                    var endpoint = lnaddy.split( "@" );
+                    var url = "https://" + endpoint[ 1 ] + "/.well-known/lnurlp/" + endpoint[ 0 ];
+                    var url_bytes = new TextEncoder().encode( url );
+                    var lnurl = bech32.bech32.encode( "lnurl", bech32.bech32.toWords( url_bytes ), 100_000 );
+                    var data = await fetch( url );
+                    data = await data.json();
+                    var serverpub = data[ "nostrPubkey" ];
+                    var privkey = nwcjs.bytesToHex( nobleSecp256k1.utils.randomPrivateKey() );
+                    var pubkey = nobleSecp256k1.getPublicKey( privkey, true ).substring( 2 );
+                    var obj = {
+                        kind: 9734,
+                        content: "",
+                        tags: [
+                          [ "relays", ...relays ],
+                          [ "amount", `${amount}` ],
+                          [ "p", serverpub ],
+                          [ "e", pubkey ],
+                          [ "lnurl", lnurl ],
+                        ],
+                        created_at: Math.floor( Date.now() / 1000 ),
+                        pubkey: pubkey,
+                    }
+                    var event = await nwcjs.getSignedEvent( obj, privkey );
+                    var id = event.id;
+                    var encoded = encodeURI( JSON.stringify( event ) );
+                    var callback = data[ "callback" ] + "?amount=" + amount + "&nostr=" + encoded + "&lnurl=" + lnurl;
+                    var invoice_data = await fetch( callback );
+                    var {pr: invoice} = await invoice_data.json();
+                    var checking_id = pubkey;
+                    return [ invoice, checking_id, privkey ];
+                }
+                super_nostr.prepEvent = async ( privkey, msg, kind, tags, override_timestamp ) => {
+                    var pubkey = super_nostr.getPubkey( privkey );
+                    if ( !tags ) tags = [];
+                    var event = {
+                        "content": msg,
+                        "created_at": override_timestamp ? override_timestamp : Math.floor( Date.now() / 1000 ),
+                        "kind": kind,
+                        "tags": tags,
+                        "pubkey": pubkey,
+                    }
+                    var signedEvent = await super_nostr.getSignedEvent( event, privkey );
+                    return signedEvent;
+                }
+            }
+        </script>
+        <div class="black-bg hidden" onclick="modalVanish();"></div>
+        <div class="modal hidden"></div>
+    </body>
+</html> 
