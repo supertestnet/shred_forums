@@ -488,7 +488,7 @@
                     if ( typeof event !== "object" ) return alert( `unknown error, please try again` );
                     if ( !parent_relays ) super_nostr.sendEvent( event, shred_forums.relays[ 0 ] );
                     else super_nostr.sendEvent( event, parent_relays[ 0 ] );
-                    console.log( 'post successful' );
+                    showModal( '<p>post successful</p>' );
                 },
                 convertHMS: value => {
                     if ( value < 0 ) value = 0;
@@ -913,7 +913,7 @@
                 }
                 if ( user_needs_proof_of_zap ) {
                     var [ invoice, checking_id, zapper_privkey ] = await nwcjs.getZapRequest( shred_forums.zapgate, shred_forums.zapgate_amt_to_post );
-                    console.log( 'pay this invoice:', invoice );
+                    showModal( `<p>Pay this invoice</p><p>${invoice}</p>` );
                     var loop = async () => {
                         var receipt = await nwcjs.checkZapStatus( invoice, checking_id );
                         if ( receipt !== "not paid yet" ) return receipt;
