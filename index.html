@@ -433,7 +433,7 @@
                     var authors = null;
                     var kinds = [ 49150 ];
                     var until = null;
-                    var since = 1752123251;
+                    var since = 1752125679;
                     var limit = 5;
                     //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
                     var etags = [ '0000000000000000000000000000000000000000000000000000746872656164' ];
@@ -474,7 +474,7 @@
                     }
                 },
                 stringIsAcceptable: string => !!string.match( /^[a-zA-Z0-9_]+$/ ),
-                createPost: async ( content, subforum, title, parent_nevent ) => {
+                createPost: async ( content, subforum, title, parent_nevent, this_post_is_a_level_1_comment ) => {
                     if ( !content || !subforum ) return alert( 'you forgot to write some content or a subforum' );
                     if ( typeof content !== "string" || typeof subforum !== "string" ) return alert( 'must be strings' );
                     if ( !shred_forums.stringIsAcceptable( subforum ) ) return alert( 'subforum may only contain letters, numbers, and underscores' );
@@ -487,6 +487,13 @@
                     var pubkey = super_nostr.getPubkey( privkey );
                     var parent_hash = null;
                     var parent_relays = null;
+                    //the OP does not say what thread it is
+                    //comments are supposed to say what thread
+                    //they are replying to, so they get the
+                    //thread from one of two sources: they get
+                    //it from the parent's hash, if they are
+                    //a level 1 comment, otherwise they get
+                    //it from the first e tag of their parent
                     if ( !parent_nevent ) {
                         //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
                         var tags = [ [ "e", "0000000000000000000000000000000000000000000000000000746872656164" ], [ "n", subforum ] ];
@@ -497,10 +504,13 @@
                         var [ parent_hash, parent_relays ] = shred_forums.convertNEvent( parent_nevent );
                         var parent_event = shred_forums.events_to_display[ parent_hash ];
                         var tags = [ [ "e", parent_hash, parent_relays[ 0 ] ] ];
-                        var thread = shred_forums.getThreadFromNostrEvent( parent_event );
-                        if ( thread ) tags.unshift( [ "e", thread, parent_relays[ 0 ] ] );
+                        if ( this_post_is_a_level_1_comment ) var thread = parent_hash;
+                        else var thread = shred_forums.getThreadFromNostrEvent( parent_event );
+                        if ( !this_post_is_a_level_1_comment ) tags.unshift( [ "e", thread, parent_relays[ 0 ] ] );
                     }
                     if ( title ) tags.push( [ "t", title ] );
+                    console.log( 1, 'tags:' );
+                    console.log( tags );
                     var now = Math.floor( Date.now() / 1000 );
                     var data_for_ots = JSON.stringify([
                         0,
@@ -1078,7 +1088,8 @@
             $( `.submit_thread_comment` ).onclick = async () => {
                 var comment = $( `.thread_comment_box` ).value;
                 var parent_nevent = params.t;
-                shred_forums.createPost( comment, "_", null, parent_nevent );
+                var this_post_is_a_level_1_comment = true;
+                shred_forums.createPost( comment, "_", null, parent_nevent, this_post_is_a_level_1_comment );
             }
             var showPage = page => {
                 $( '.home_page' ).classList.add( "hidden" );
