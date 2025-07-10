@@ -200,17 +200,29 @@
                 margin-top: 1rem;
             }
             .thread_comment * {
-                font-size: 85%;
+                font-size: 1rem;
             }
-            .thread_comment .comment_timestamp {
-                font-size: 70%;
+            .comment_replies .thread_comment {
+                border-left: 1px solid #aaaaaa;
+            }
+            .thread_comment .comment_timestamp,
+            .thread_comment .author_nym,
+            .thread_comment .comment_btn {
+                font-size: 0.8rem;
             }
             .thread_comment .author_pic {
                 width: 1.5rem;
             }
             .thread_page .comment_content {
                 margin-top: 0.5rem;
-                font-size: 80%;
+                font-size: 0.9rem;
+            }
+            .comment_replies {
+                padding-left: 1rem;
+            }
+            .thread_page .comment_handlers,
+            .thread_page .comment_reply_div {
+                margin-top: 0.5rem;
             }
             @media screen and (max-width: 600px) {
             }
@@ -289,7 +301,7 @@
                     <div class="featured_topics_title">Featured Topic</div>
                     <div class="featured_topics"></div>
                 </div>
-                <div class="all_topics_title">All topics</div>
+                <!-- <div class="all_topics_title">All topics</div> -->
                 <div class="all_topics">loading...</div>
             </div>
             <div class="profile_page hidden">
@@ -324,11 +336,11 @@
                     <p class="thread_log_in_msg">Log in to comment</p>
                     <p><button class="thread_log_in_btn">Log&nbsp;in</button></p>
                 </div>
-                <div class="thread_reply_div hidden">
+                <div class="thread_comment_div hidden">
                     <hr>
                     <p>Enter your comment</p>
-                    <p><textarea class="thread_reply_box"></textarea></p>
-                    <p><button class="submit_thread_reply">Submit</button></p>
+                    <p><textarea class="thread_comment_box"></textarea></p>
+                    <p><button class="submit_thread_comment">Submit</button></p>
                 </div>
                 <div class="thread_comments"></div>
             </div>
@@ -361,13 +373,15 @@
                         $( '.login_btn' ).onclick = () => showPage( "profile_page" );
                         $( '.new_btn' ).classList.remove( "hidden" );
                         $( '.thread_log_in' ).classList.add( "hidden" );
-                        $( '.thread_reply_div' ).classList.remove( "hidden" );
+                        $( '.thread_comment_div' ).classList.remove( "hidden" );
+                        $$( '.comment_handlers' ).forEach( item => item.classList.remove( "hidden" ) );
                     } else {
                         $( '.login_btn' ).innerHTML = `Log&nbsp;in`;
                         $( `.login_btn` ).onclick = shred_forums.showLoginModal;
                         $( '.new_btn' ).classList.add( "hidden" );
                         $( '.thread_log_in' ).classList.remove( "hidden" );
-                        $( '.thread_reply_div' ).classList.add( "hidden" );
+                        $( '.thread_comment_div' ).classList.add( "hidden" );
+                        $$( '.comment_handlers' ).forEach( item => item.classList.add( "hidden" ) );
                     }
                 },
                 showLoginModal: async () => {
@@ -431,6 +445,11 @@
                         if ( zap_receipt.tags[ i ] && zap_receipt.tags[ i ][ 0 ] && zap_receipt.tags[ i ][ 1 ] && zap_receipt.tags[ i ][ 0 ] === "bolt11" ) return zap_receipt.tags[ i ][ 1 ];
                     }
                 },
+                getThreadFromNostrEvent: event => {
+                    var i; for ( i=0; i<event.tags.length; i++ ) {
+                        if ( event.tags[ i ] && event.tags[ i ][ 0 ] && event.tags[ i ][ 1 ] && event.tags[ i ][ 0 ] === "e" ) return event.tags[ i ][ 1 ];
+                    }
+                },
                 getTitleFromNostrEvent: event => {
                     var i; for ( i=0; i<event.tags.length; i++ ) {
                         if ( event.tags[ i ] && event.tags[ i ][ 0 ] && event.tags[ i ][ 1 ] && event.tags[ i ][ 0 ] === "t" ) return event.tags[ i ][ 1 ];
@@ -458,14 +477,17 @@
                     if ( !shred_forums.privkey ) return alert( 'you must log in' );
                     var privkey = shred_forums.privkey;
                     var pubkey = super_nostr.getPubkey( privkey );
-                    var parent_pubkey = null;
+                    var parent_hash = null;
                     var parent_relays = null;
                     if ( !parent_nevent ) {
                         //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
                         var tags = [ [ "e", "0000000000000000000000000000000000000000000000000000746872656164" ], [ "n", subforum ] ];
                     } else {
-                        var [ parent_pubkey, parent_relays ] = shred_forums.convertNEvent( parent_nevent );
-                        var tags = [ [ "e", parent_pubkey, parent_relays[ 0 ] ] ];
+                        var [ parent_hash, parent_relays ] = shred_forums.convertNEvent( parent_nevent );
+                        var parent_event = shred_forums.events_to_display[ parent_hash ];
+                        var tags = [ [ "e", parent_hash, parent_relays[ 0 ] ] ];
+                        var thread = shred_forums.getThreadFromNostrEvent( parent_event );
+                        if ( thread ) tags.unshift( [ "e", thread, parent_relays[ 0 ] ] );
                     }
                     if ( title ) tags.push( [ "t", title ] );
                     var now = Math.floor( Date.now() / 1000 );
@@ -705,9 +727,20 @@
                             div.getElementsByClassName( "thread_snippet" )[ 0 ].innerText = event.content.length > 90 ? event.content.substring( 0, 90 ) + "..." : event.content;
                         }
                         if ( page_to_display_events_on === 'thread_page' ) {
+                            //check if the event has two parents
+                            var num_of_etags = 0;
+                            var last_parent = null;
+                            event.tags.forEach( tag => {if ( tag[ 0 ] && tag[ 1 ] && tag[ 0 ] === "e" ) {num_of_etags = num_of_etags + 1;last_parent = tag[ 1 ]}});
+                            //a comment with two parents is a reply to a comment or to another reply
+                            //do not display such replies til all of their parents exist
+                            if ( num_of_etags > 1 && !$( `[ data-event_id="${last_parent}" ]` ) ) return shred_forums.events_displayed.pop();
+                            var level = 0;
+                            if ( $( `[ data-event_id="${last_parent}" ]` ) ) level = Number( $( `[ data-event_id="${last_parent}" ]` ).getAttribute( "data-comment_level" ) );
+                            level = level + 1;
                             var op_nevent = params.t;
                             var [ op_event_id ] = shred_forums.convertNEvent( op_nevent );
                             div.classList.add( "thread_comment" );
+                            div.setAttribute( "data-comment_level", String( level ) );
                             div.innerHTML = `
                                 <div class="comment_meta">
                                     <div class="pic_and_nym">
@@ -717,8 +750,27 @@
                                     <div class="comment_timestamp"></div>
                                 </div>
                                 <div class="comment_content"></div>
+                                <div class="comment_handlers hidden">
+                                    <div class="comment_btns"><button class="comment_btn comment_reply_btn">Reply</button> <button class="comment_btn zap_btn">Zap</button></div>
+                                    <div class="comment_reply_div hidden">
+                                        <textarea class="comment_reply_box"></textarea>
+                                        <p><button class="comment_btn submit_comment_reply">Submit</button></p>
+                                    </div>
+                                </div>
+                                <div class="comment_replies"></div>
                             `;
                             div.getElementsByClassName( "comment_content" )[ 0 ].innerText = event.content;
+                            div.getElementsByClassName( "comment_reply_btn" )[ 0 ].onclick = () => {
+                                var element = div.getElementsByClassName( "comment_reply_div" )[ 0 ];
+                                if ( element.classList.contains( "hidden" ) ) element.classList.remove( "hidden" );
+                                else element.classList.add( "hidden" );
+                            }
+                            div.getElementsByClassName( "submit_comment_reply" )[ 0 ].onclick = () => {
+                                var comment = div.getElementsByClassName( "comment_reply_box" )[ 0 ].value;
+                                var parent_nevent = shred_forums.convertPubkeyAndRelaysToNprofile( "nevent", event.id, shred_forums.relays );
+                                shred_forums.createPost( comment, "_", null, parent_nevent );
+                                div.getElementsByClassName( "comment_reply_div" )[ 0 ].classList.add( "hidden" );
+                            }
                         }
                         if ( !shred_forums.profiles.hasOwnProperty( event.pubkey ) ) shred_forums.profiles[ event.pubkey ] = {
                             hide_posts_by_this_user: false,
@@ -731,8 +783,10 @@
                         var how_long_ago = shred_forums.convertHMS( Math.floor( Date.now() / 1000 ) - event.created_at );
                         if ( page_to_display_events_on === 'thread_page' ) {
                             div.getElementsByClassName( "comment_timestamp" )[ 0 ].innerHTML = `&bull; &nbsp;${how_long_ago}`;
-                            console.log( 'displaying thread' );
-                            $( '.thread_comments' ).append( div );
+                            if ( level === 1 ) $( '.thread_comments' ).append( div );
+                            else {
+                                $( `[ data-event_id="${last_parent}" ] .comment_replies` ).append( div );
+                            }
                         }
                         if ( page_to_display_events_on === 'home_page' ) {
                             how_long_ago = how_long_ago + " in";
@@ -884,7 +938,6 @@
             $( `.new_btn` ).onclick = async () => {
                 var html = `
                     <p><button class="new_thread">New thread</button></p>
-                    <p><button class="new_post">New post</button></p>
                 `;
                 showModal( html );
                 $( '.new_thread' ).onclick = () => {
@@ -985,11 +1038,11 @@
                 }
             }
             $( `.thread_log_in` ).onclick = shred_forums.showLoginModal;
-                var reply = $( `.thread_reply_box` ).value = "";
-            $( `.submit_thread_reply` ).onclick = async () => {
-                var reply = $( `.thread_reply_box` ).value;
+            var comment = $( `.thread_comment_box` ).value = "";
+            $( `.submit_thread_comment` ).onclick = async () => {
+                var comment = $( `.thread_comment_box` ).value;
                 var parent_nevent = params.t;
-                shred_forums.createPost( reply, "_", null, parent_nevent );
+                shred_forums.createPost( comment, "_", null, parent_nevent );
             }
             var showPage = page => {
                 $( '.home_page' ).classList.add( "hidden" );
@@ -1013,6 +1066,8 @@
                     var events = await super_nostr.getEvents( relay, ids );
                     var event = events[ 0 ];
                     if ( !event ) return alert( 'error loading thread, please reload page' );
+                    shred_forums.events_displayed.push( event.id );
+                    shred_forums.events_to_display[ event.id ] = event;
                     var title = shred_forums.getTitleFromNostrEvent( event );
                     var subforum = shred_forums.getSubforumFromNostrEvent( event );
                     $( '.thread_page .thread_title' ).innerText = title;
@@ -1026,9 +1081,10 @@
                     shred_forums.loadProfile( event );
                     $( '.thread_page .author_pic' ).style.backgroundImage = `url( '${shred_forums.profiles[ event.pubkey ].pic}' )`;
                     $( '.thread_page .author_nym' ).innerText = shred_forums.profiles[ event.pubkey ].nym;
-                    var how_long_ago = shred_forums.convertHMS( Math.floor( Date.now() / 1000 ) - event.created_at ) + " in";
+                    var how_long_ago = shred_forums.convertHMS( Math.floor( Date.now() / 1000 ) - event.created_at );
+                    if ( subforum ) how_long_ago = how_long_ago + " in";
                     $( '.thread_page .thread_timestamp' ).innerText = how_long_ago;
-                    $( '.thread_page .thread_subforum' ).innerText = subforum;
+                    if ( subforum ) $( '.thread_page .thread_subforum' ).innerText = subforum;
                     $( '.thread_page .thread_meta' ).setAttribute( "data-userpub", event.pubkey );
                     $( '.thread_page .thread_title' ).setAttribute( "data-event_id", event.id );
                     var relay = relays[ 0 ];
