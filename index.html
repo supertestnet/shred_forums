@@ -224,6 +224,10 @@
             .thread_page .comment_reply_div {
                 margin-top: 0.5rem;
             }
+            .longer_thread_link:hover {
+                cursor: pointer;
+                text-decoration: underline;
+            }
             @media screen and (max-width: 600px) {
             }
         </style>
@@ -353,6 +357,8 @@
                 profiles: {},
                 events_to_display: {},
                 events_displayed: [],
+                checked_for_zap_tracker: [],
+                depth_permitted: 7,
                 zapgate: "supertestnet@coinos.io",
                 zapgate_amt_to_post: 10, //paying this amount of sats lets users create 30 posts -- if any user hits that limit, they cannot post again unless they pay this amount again
                 zapgate_amt_to_moderate: 30_000, //paying this amount of sats lets any user become a moderator of a subforum that does not yet *have* a moderator
@@ -427,7 +433,7 @@
                     var authors = null;
                     var kinds = [ 49150 ];
                     var until = null;
-                    var since = 1751738865;
+                    var since = 1752123251;
                     var limit = 5;
                     //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
                     var etags = [ '0000000000000000000000000000000000000000000000000000746872656164' ];
@@ -471,10 +477,12 @@
                 createPost: async ( content, subforum, title, parent_nevent ) => {
                     if ( !content || !subforum ) return alert( 'you forgot to write some content or a subforum' );
                     if ( typeof content !== "string" || typeof subforum !== "string" ) return alert( 'must be strings' );
-                    if ( !shred_forums.stringIsAcceptable( subforum ) ) return alert( 'subforum must be alphanumeric, except for underscores' );
-                    if ( subforum.length >= 15 ) return alert( 'subforum must less than 15 characters' );
+                    if ( !shred_forums.stringIsAcceptable( subforum ) ) return alert( 'subforum may only contain letters, numbers, and underscores' );
+                    if ( subforum.length >= 32 ) return alert( 'subforum must less than 32 characters' );
+                    if ( subforum === "_" ) subforum = "";
                     if ( title && !( typeof title === "string" && title.length < 60 ) ) return alert( 'title must be a string of less than 60 characters' );
                     if ( !shred_forums.privkey ) return alert( 'you must log in' );
+                    showModal( '<p>submitting...</p>' );
                     var privkey = shred_forums.privkey;
                     var pubkey = super_nostr.getPubkey( privkey );
                     var parent_hash = null;
@@ -482,6 +490,9 @@
                     if ( !parent_nevent ) {
                         //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
                         var tags = [ [ "e", "0000000000000000000000000000000000000000000000000000746872656164" ], [ "n", subforum ] ];
+                        //we also insert the subforum name as a hex string
+                        var subforum_as_hex = shred_forums.textToHex( subforum ).padStart( 64, '0' );
+                        tags.push( [ "e", subforum_as_hex ] );
                     } else {
                         var [ parent_hash, parent_relays ] = shred_forums.convertNEvent( parent_nevent );
                         var parent_event = shred_forums.events_to_display[ parent_hash ];
@@ -698,7 +709,7 @@
                     var sig_is_valid = await nobleSecp256k1.schnorr.verify( sig, event.pubkey, event.pubkey );
                     if ( !sig_is_valid ) throw( 'user did not authenticate properly, the Proof of Ownership they sent was invalid' );
                 },
-                prepareToDisplayEvents: async page_to_display_events_on => {
+                displayEvents: async page_to_display_events_on => {
                     var events = Object.keys( shred_forums.events_to_display );
                     events.forEach( ( event_id, index ) => {
                         if ( shred_forums.events_displayed.includes( event_id ) ) return;
@@ -723,6 +734,13 @@
                             `;
                             var title = shred_forums.getTitleFromNostrEvent( event );
                             var subforum = shred_forums.getSubforumFromNostrEvent( event );
+                            var subforum_as_hex = shred_forums.textToHex( subforum ).padStart( 64, '0' );
+                            //ensure there is an e tag with a hex version of the subforum
+                            var hex_version_exists = false;
+                            var i; for ( i=0; i<event.tags.length; i++ ) {
+                                if ( event.tags[ i ] && event.tags[ i ][ 0 ] && event.tags[ i ][ 1 ] && event.tags[ i ][ 0 ] === "e" && event.tags[ i ][ 1 ] === subforum_as_hex ) hex_version_exists = true;
+                            }
+                            if ( !hex_version_exists ) return;
                             div.getElementsByClassName( "thread_title" )[ 0 ].innerText = title;
                             div.getElementsByClassName( "thread_snippet" )[ 0 ].innerText = event.content.length > 90 ? event.content.substring( 0, 90 ) + "..." : event.content;
                         }
@@ -734,13 +752,14 @@
                             //a comment with two parents is a reply to a comment or to another reply
                             //do not display such replies til all of their parents exist
                             if ( num_of_etags > 1 && !$( `[ data-event_id="${last_parent}" ]` ) ) return shred_forums.events_displayed.pop();
-                            var level = 0;
-                            if ( $( `[ data-event_id="${last_parent}" ]` ) ) level = Number( $( `[ data-event_id="${last_parent}" ]` ).getAttribute( "data-comment_level" ) );
-                            level = level + 1;
+                            var comment_level = 0;
+                            if ( $( `[ data-event_id="${last_parent}" ]` ) ) comment_level = Number( $( `[ data-event_id="${last_parent}" ]` ).getAttribute( "data-comment_level" ) );
+                            comment_level = comment_level + 1;
+                            if ( comment_level > shred_forums.depth_permitted ) return;
                             var op_nevent = params.t;
                             var [ op_event_id ] = shred_forums.convertNEvent( op_nevent );
                             div.classList.add( "thread_comment" );
-                            div.setAttribute( "data-comment_level", String( level ) );
+                            div.setAttribute( "data-comment_level", String( comment_level ) );
                             div.innerHTML = `
                                 <div class="comment_meta">
                                     <div class="pic_and_nym">
@@ -759,6 +778,24 @@
                                 </div>
                                 <div class="comment_replies"></div>
                             `;
+                            if ( comment_level === shred_forums.depth_permitted - 1 ) {
+                                div.innerHTML = `
+                                    view more of this thread
+                                `;
+                                div.setAttribute( "data-event_id", event.id );
+                                div.classList.add( "longer_thread_link" );
+                                div.classList.add( "bold" );
+                                div.onclick = e => {
+                                    var target = e.target;
+                                    var event_id = target.getAttribute( "data-event_id" );
+                                    var nevent = shred_forums.convertPubkeyAndRelaysToNprofile( "nevent", event_id, shred_forums.relays );
+                                    var url = window.location.protocol + "//" + window.location.hostname + window.location.pathname + `#t=${nevent}`;
+                                    window.location.href = url;
+                                    window.location.reload();
+                                }
+                                $( `[ data-event_id="${last_parent}" ] .comment_replies` ).append( div );
+                                return;
+                            }
                             div.getElementsByClassName( "comment_content" )[ 0 ].innerText = event.content;
                             div.getElementsByClassName( "comment_reply_btn" )[ 0 ].onclick = () => {
                                 var element = div.getElementsByClassName( "comment_reply_div" )[ 0 ];
@@ -783,10 +820,8 @@
                         var how_long_ago = shred_forums.convertHMS( Math.floor( Date.now() / 1000 ) - event.created_at );
                         if ( page_to_display_events_on === 'thread_page' ) {
                             div.getElementsByClassName( "comment_timestamp" )[ 0 ].innerHTML = `&bull; &nbsp;${how_long_ago}`;
-                            if ( level === 1 ) $( '.thread_comments' ).append( div );
-                            else {
-                                $( `[ data-event_id="${last_parent}" ] .comment_replies` ).append( div );
-                            }
+                            if ( comment_level === 1 ) $( '.thread_comments' ).append( div );
+                            else $( `[ data-event_id="${last_parent}" ] .comment_replies` ).append( div );
                         }
                         if ( page_to_display_events_on === 'home_page' ) {
                             how_long_ago = how_long_ago + " in";
@@ -831,11 +866,13 @@
                         div.setAttribute( "data-event_id", event.id );
 
                         setTimeout( async() => {
+                            //ignore users who you've already checked for zap trackers
+                            if ( shred_forums.checked_for_zap_tracker.includes( event.pubkey ) ) return;
+                            shred_forums.checked_for_zap_tracker.push( event.pubkey );
                             //validate the post, and make it disappear if it does not validate
                             // when validating a post, validators load the relevant proof_of_zap -- POZ -- by searching for events by the post-maker that reference the fake event '0000000000000000000000000000000000000000007a617020747261636b6572' ('zap tracker' turned into hex and padded to 32 bytes) -- and they use the "until" option to exclude POZs created after the post they are investigating. The result is thus the post-maker's latest POZ from before the relevant post. Then they check how many posts the post-maker created after that POZ and until the relevant post, and show the post if the number of posts created in that interval is 30 or fewer
                             // load proof_of_zap from monthly tracker
                             console.log( 'loading proof of zap' );
-                            var all_user_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ event.pubkey ] );
                             var latest_zap_tracker_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ event.pubkey ], null, null, null, 1, [ '0000000000000000000000000000000000000000007a617020747261636b6572' ] );
                             if ( !latest_zap_tracker_events.length ) {
                                 console.log( 'the user has no zap trackers' );
@@ -844,11 +881,8 @@
                             }
                             var latest_zap_tracker = latest_zap_tracker_events[ 0 ];
                             try {
-                                var proof_of_zaps = JSON.parse( latest_zap_tracker.content );
-                                var time_of_latest_proof_of_zap = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zap_receipt" ].created_at;
-                                var posts_since_latest_zap_tracker = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ event.pubkey ], [ 49150 ], time_of_latest_proof_of_zap - 5, null, 31 );
-                                if ( posts_since_latest_zap_tracker.length > 30 ) throw( 'user posted without a corresponding proof_of_zap' );
                                 //validate latest proof of zap
+                                var proof_of_zaps = JSON.parse( latest_zap_tracker.content );
                                 var zapper_sig = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zapper_sig" ];
                                 var zap_receipt = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zap_receipt" ];
                                 //validate the zapper sig
@@ -924,9 +958,10 @@
                         });
                         shred_forums.loadProfile( event );
                     });
-                    await super_nostr.waitSomeSeconds( 5 );
-                    shred_forums.prepareToDisplayEvents( page_to_display_events_on );
+                    await shred_forums.waitSomeTime( 100 );
+                    shred_forums.displayEvents( page_to_display_events_on );
                 },
+                waitSomeTime: num => new Promise( resolve => setTimeout( resolve, num ) ),
             }
             shred_forums.renderLoginChanges();
             $( `.site_name` ).onclick = () => {
@@ -946,6 +981,7 @@
                 }
             }
             $( `.submit_new_thread` ).onclick = async () => {
+                showModal( '<p>submitting...</p>' );
                 var title = $( '.new_thread_page .thread_title' ).value;
                 var content = $( '.new_thread_page .thread_content' ).value;
                 var subforum = $( '.new_thread_page .thread_subforum' ).value;
@@ -1055,7 +1091,7 @@
                 if ( !window.location.href.includes( "#" ) ) shred_forums.populateHomepage();
                 var page_to_display_events_on = 'home_page';
                 if ( params.hasOwnProperty( "t" ) ) page_to_display_events_on = 'thread_page';
-                shred_forums.prepareToDisplayEvents( page_to_display_events_on );
+                shred_forums.displayEvents( page_to_display_events_on );
                 // if on thread page, load thread
                 if ( window.location.href.includes( "#t=" ) ) {
                     var thread_nevent = params.t;
