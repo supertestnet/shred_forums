@@ -348,6 +348,10 @@
                 </div>
                 <div class="thread_comments"></div>
             </div>
+            <div class="subforum_page hidden">
+                <h1>Subforum page</h1>
+                <div class="subforum_threads">loading...</div>
+            </div>
         </div>
         <div class="new_btn hidden">+</div>
         <script>
@@ -743,8 +747,37 @@
                         if ( !event ) return;
                         shred_forums.events_displayed.push( event.id );
                         var div = document.createElement( "div" );
+                        div.setAttribute( "data-userpub", event.pubkey );
+                        div.setAttribute( "data-event_id", event.id );
                         if ( page_to_display_events_on === 'home_page' ) {
                             if ( $( '.all_topics' ).innerText === 'loading...' ) $( '.all_topics' ).innerHTML = ``;
+                            div.classList.add( "thread_summary" );
+                            div.innerHTML = `
+                                <div class="thread_title"></div>
+                                <div class="thread_snippet"></div>
+                                <div class="thread_meta">
+                                    <div class="pic_and_nym">
+                                        <div class="author_pic"></div>
+                                        <div class="author_nym"></div>
+                                    </div>
+                                    <div class="thread_timestamp"></div>
+                                    <div class="thread_subforum bold"></div>
+                                </div>
+                            `;
+                            var title = shred_forums.getTitleFromNostrEvent( event );
+                            var subforum = shred_forums.getSubforumFromNostrEvent( event );
+                            var subforum_as_hex = shred_forums.textToHex( subforum ).padStart( 64, '0' );
+                            //ensure there is an e tag with a hex version of the subforum
+                            var hex_version_exists = false;
+                            var i; for ( i=0; i<event.tags.length; i++ ) {
+                                if ( event.tags[ i ] && event.tags[ i ][ 0 ] && event.tags[ i ][ 1 ] && event.tags[ i ][ 0 ] === "e" && event.tags[ i ][ 1 ] === subforum_as_hex ) hex_version_exists = true;
+                            }
+                            if ( !hex_version_exists ) return;
+                            div.getElementsByClassName( "thread_title" )[ 0 ].innerText = title;
+                            div.getElementsByClassName( "thread_snippet" )[ 0 ].innerText = event.content.length > 90 ? event.content.substring( 0, 90 ) + "..." : event.content;
+                        }
+                        if ( page_to_display_events_on === 'subforum_page' ) {
+                            if ( $( '.subforum_threads' ).innerText === 'loading...' ) $( '.subforum_threads' ).innerHTML = ``;
                             div.classList.add( "thread_summary" );
                             div.innerHTML = `
                                 <div class="thread_title"></div>
@@ -851,7 +884,7 @@
                             if ( comment_level === 1 ) $( '.thread_comments' ).append( div );
                             else $( `[ data-event_id="${last_parent}" ] .comment_replies` ).append( div );
                         }
-                        if ( page_to_display_events_on === 'home_page' ) {
+                        if ( page_to_display_events_on === 'home_page' || page_to_display_events_on === 'subforum_page' ) {
                             how_long_ago = how_long_ago + " in";
                             div.getElementsByClassName( "thread_timestamp" )[ 0 ].innerText = how_long_ago;
                             div.getElementsByClassName( "thread_subforum" )[ 0 ].innerText = subforum;
@@ -873,7 +906,10 @@
                                     return;
                                 }
                                 if ( target.classList.contains( "thread_subforum" ) ) {
-                                    console.log( 'visit this subforum:', e.target.innerText );
+                                    var subforum = e.target.innerText;
+                                    var url = window.location.protocol + "//" + window.location.hostname + window.location.pathname + `#n=${subforum}`;
+                                    window.location.href = url;
+                                    window.location.reload();
                                     return;
                                 }
                                 var loop = target => {
@@ -888,10 +924,9 @@
                                 window.location.href = url;
                                 window.location.reload();
                             }
-                            $( '.all_topics' ).append( div );
                         }
-                        div.setAttribute( "data-userpub", event.pubkey );
-                        div.setAttribute( "data-event_id", event.id );
+                        if ( page_to_display_events_on === 'home_page' ) $( '.all_topics' ).append( div );
+                        if ( page_to_display_events_on === 'subforum_page' ) $( '.subforum_threads' ).append( div );
 
                         setTimeout( async() => {
                             //ignore users who you've already checked for zap trackers
@@ -1105,13 +1140,33 @@
                 $( '.profile_page' ).classList.add( "hidden" );
                 $( '.new_thread_page' ).classList.add( "hidden" );
                 $( '.thread_page' ).classList.add( "hidden" );
+                $( '.subforum_page' ).classList.add( "hidden" );
                 $( `.${page}` ).classList.remove( "hidden" );
             }
             window.onload = async () => {
                 if ( !window.location.href.includes( "#" ) ) shred_forums.populateHomepage();
                 var page_to_display_events_on = 'home_page';
                 if ( params.hasOwnProperty( "t" ) ) page_to_display_events_on = 'thread_page';
+                if ( params.hasOwnProperty( "n" ) ) page_to_display_events_on = 'subforum_page';
                 shred_forums.displayEvents( page_to_display_events_on );
+                // if on subforum page, load threads in that subforum
+                if ( window.location.href.includes( "#n=" ) ) {
+                    var relay = shred_forums.relays[ 0 ];
+                    var ids = null;
+                    var authors = null;
+                    var kinds = [ 49150 ];
+                    var until = null;
+                    var since = 1752125679;
+                    var limit = 5;
+                    //0000000000000000000000000000000000000000000000000000746872656164 is "thread" turned into hex and padded to 32 bytes
+                    var subforum = params.n;
+                    var subforum_as_hex = shred_forums.textToHex( subforum ).padStart( 64, '0' );
+                    var etags = [ subforum_as_hex ];
+                    var events = await super_nostr.getEvents( relay, ids, authors, kinds, until, since, limit, etags );
+                    if ( !events.length ) $( '.subforum_threads' ).innerHTML = `None found`;
+                    events.forEach( event => shred_forums.events_to_display[ event.id ] = event );
+                    showPage( "subforum_page" );
+                }
                 // if on thread page, load thread
                 if ( window.location.href.includes( "#t=" ) ) {
                     var thread_nevent = params.t;
@@ -1143,6 +1198,32 @@
                     if ( subforum ) $( '.thread_page .thread_subforum' ).innerText = subforum;
                     $( '.thread_page .thread_meta' ).setAttribute( "data-userpub", event.pubkey );
                     $( '.thread_page .thread_title' ).setAttribute( "data-event_id", event.id );
+                    var div = $( '.thread_page .thread_meta' );
+                    div.onclick = e => {
+                        var target = e.target;
+                        if (
+                            target.classList.contains( "pic_and_nym" ) ||
+                            target.classList.contains( "author_nym" ) ||
+                            target.classList.contains( "author_pic" )
+                            ) {
+                            var loop = target2 => {
+                                if ( target2.classList.contains( "thread_meta" ) ) return target2;
+                                target2 = target2.parentElement;
+                                return loop( target2 );
+                            }
+                            target2 = loop( target );
+                            var user = target2.getAttribute( "data-userpub" );
+                            console.log( 'visit this user:', user );
+                            return;
+                        }
+                        if ( target.classList.contains( "thread_subforum" ) ) {
+                            var subforum = e.target.innerText;
+                            var url = window.location.protocol + "//" + window.location.hostname + window.location.pathname + `#n=${subforum}`;
+                            window.location.href = url;
+                            window.location.reload();
+                            return;
+                        }
+                    }
                     var relay = relays[ 0 ];
                     var ids = null;
                     var authors = null;
