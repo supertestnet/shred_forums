@@ -359,6 +359,7 @@
                 events_displayed: [],
                 checked_for_zap_tracker: [],
                 depth_permitted: 7,
+                user_can_post: false,
                 zapgate: "supertestnet@coinos.io",
                 zapgate_amt_to_post: 10, //paying this amount of sats lets users create 30 posts -- if any user hits that limit, they cannot post again unless they pay this amount again
                 zapgate_amt_to_moderate: 30_000, //paying this amount of sats lets any user become a moderator of a subforum that does not yet *have* a moderator
@@ -417,10 +418,25 @@
                         $( `.done_making_new_account` ).onclick = () => {shred_forums.login( backup_words );}
                     }
                 },
-                login: backup_words => {
+                login: async backup_words => {
+                    modalVanish();
                     shred_forums.privkey = shred_forums.getPrivkeyFromBackupWords( backup_words, `44'/1237'/0'/0`, 0 );
                     shred_forums.renderLoginChanges();
-                    modalVanish();
+                    //check if user can post
+                    var main_pubkey = super_nostr.getPubkey( shred_forums.privkey );
+                    var latest_zap_tracker_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ main_pubkey ], null, null, null, 1, [ '0000000000000000000000000000000000000000007a617020747261636b6572' ] );
+                    var latest_zap_tracker = null;
+                    if ( latest_zap_tracker_events.length ) latest_zap_tracker = latest_zap_tracker_events[ 0 ];
+                    var user_needs_proof_of_zap = false;
+                    if ( !latest_zap_tracker ) user_needs_proof_of_zap = true;
+                    else {
+                        //ensure the number of posts they made since their last proof of zap is less than 31
+                        var proof_of_zaps = JSON.parse( latest_zap_tracker.content );
+                        var time_of_latest_proof_of_zap = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zap_receipt" ].created_at;
+                        var posts_since_latest_zap_tracker = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ main_pubkey ], [ 49150 ], time_of_latest_proof_of_zap - 5, null, 31 );
+                        if ( posts_since_latest_zap_tracker.length > 30 ) user_needs_proof_of_zap = true;
+                    }
+                    if ( !user_needs_proof_of_zap ) shred_forums.user_can_post = true;
                 },
                 logout: () => {
                     shred_forums.privkey = null;
@@ -812,9 +828,11 @@
                                 if ( element.classList.contains( "hidden" ) ) element.classList.remove( "hidden" );
                                 else element.classList.add( "hidden" );
                             }
-                            div.getElementsByClassName( "submit_comment_reply" )[ 0 ].onclick = () => {
+                            div.getElementsByClassName( "submit_comment_reply" )[ 0 ].onclick = async () => {
                                 var comment = div.getElementsByClassName( "comment_reply_box" )[ 0 ].value;
                                 var parent_nevent = shred_forums.convertPubkeyAndRelaysToNprofile( "nevent", event.id, shred_forums.relays );
+                                //only let the user post if they've paid enough
+                                if ( !shred_forums.user_can_post ) await shred_forums.zapToPost();
                                 shred_forums.createPost( comment, "_", null, parent_nevent );
                                 div.getElementsByClassName( "comment_reply_div" )[ 0 ].classList.add( "hidden" );
                             }
@@ -972,45 +990,8 @@
                     shred_forums.displayEvents( page_to_display_events_on );
                 },
                 waitSomeTime: num => new Promise( resolve => setTimeout( resolve, num ) ),
-            }
-            shred_forums.renderLoginChanges();
-            $( `.site_name` ).onclick = () => {
-                var url = window.location.protocol + "//" + window.location.hostname + window.location.pathname;
-                if ( url.endsWith( "//" ) ) url = url.substring( 0, url.length - 1 );
-                window.location.href = url;
-            }
-            $( `.log_out_btn` ).onclick = shred_forums.logout;
-            $( `.new_btn` ).onclick = async () => {
-                var html = `
-                    <p><button class="new_thread">New thread</button></p>
-                `;
-                showModal( html );
-                $( '.new_thread' ).onclick = () => {
-                    showPage( "new_thread_page" );
-                    modalVanish();
-                }
-            }
-            $( `.submit_new_thread` ).onclick = async () => {
-                showModal( '<p>submitting...</p>' );
-                var title = $( '.new_thread_page .thread_title' ).value;
-                var content = $( '.new_thread_page .thread_content' ).value;
-                var subforum = $( '.new_thread_page .thread_subforum' ).value;
-                //only post a proof of zap if user needs one; to find out if they need one, get the user's last zap tracker and ensure the number of posts they made since their last proof of zap is less than 31
-                //get the user's latest zap tracker
-                var main_pubkey = super_nostr.getPubkey( shred_forums.privkey );
-                var latest_zap_tracker_events = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ main_pubkey ], null, null, null, 1, [ '0000000000000000000000000000000000000000007a617020747261636b6572' ] );
-                var latest_zap_tracker = null;
-                if ( latest_zap_tracker_events.length ) latest_zap_tracker = latest_zap_tracker_events[ 0 ];
-                var user_needs_proof_of_zap = false;
-                if ( !latest_zap_tracker ) user_needs_proof_of_zap = true;
-                else {
-                    //ensure the number of posts they made since their last proof of zap is less than 31
-                    var proof_of_zaps = JSON.parse( latest_zap_tracker.content );
-                    var time_of_latest_proof_of_zap = proof_of_zaps[ proof_of_zaps.length - 1 ][ "zap_receipt" ].created_at;
-                    var posts_since_latest_zap_tracker = await super_nostr.getEvents( shred_forums.relays[ 0 ], null, [ main_pubkey ], [ 49150 ], time_of_latest_proof_of_zap - 5, null, 31 );
-                    if ( posts_since_latest_zap_tracker.length > 30 ) user_needs_proof_of_zap = true;
-                }
-                if ( user_needs_proof_of_zap ) {
+                zapToPost: async () => {
+                    var main_pubkey = super_nostr.getPubkey( shred_forums.privkey );
                     var [ invoice, checking_id, zapper_privkey ] = await nwcjs.getZapRequest( shred_forums.zapgate, shred_forums.zapgate_amt_to_post );
                     showModal( `<p>Pay this invoice</p><p>${invoice}</p>` );
                     var loop = async () => {
@@ -1045,7 +1026,33 @@
                     var tracker_event = await super_nostr.prepEvent( shred_forums.privkey, JSON.stringify( zaps_tracker ), tracker_kind_number, [ [ 'e', '0000000000000000000000000000000000000000007a617020747261636b6572' ] ] );
                     super_nostr.sendEvent( tracker_event, shred_forums.relays[ 0 ] );
                     console.log( 'zap tracker posted' );
+                    shred_forums.user_can_post = true;
+                },
+            }
+            shred_forums.renderLoginChanges();
+            $( `.site_name` ).onclick = () => {
+                var url = window.location.protocol + "//" + window.location.hostname + window.location.pathname;
+                if ( url.endsWith( "//" ) ) url = url.substring( 0, url.length - 1 );
+                window.location.href = url;
+            }
+            $( `.log_out_btn` ).onclick = shred_forums.logout;
+            $( `.new_btn` ).onclick = async () => {
+                var html = `
+                    <p><button class="new_thread">New thread</button></p>
+                `;
+                showModal( html );
+                $( '.new_thread' ).onclick = () => {
+                    showPage( "new_thread_page" );
+                    modalVanish();
                 }
+            }
+            $( `.submit_new_thread` ).onclick = async () => {
+                showModal( '<p>submitting...</p>' );
+                var title = $( '.new_thread_page .thread_title' ).value;
+                var content = $( '.new_thread_page .thread_content' ).value;
+                var subforum = $( '.new_thread_page .thread_subforum' ).value;
+                //only let the user post if they've paid enough
+                if ( !shred_forums.user_can_post ) await shred_forums.zapToPost();
                 shred_forums.createPost( content, subforum, title );
                 console.log( 'thread created' );
             }
@@ -1089,6 +1096,8 @@
                 var comment = $( `.thread_comment_box` ).value;
                 var parent_nevent = params.t;
                 var this_post_is_a_level_1_comment = true;
+                //only let the user post if they've paid enough
+                if ( !shred_forums.user_can_post ) await shred_forums.zapToPost();
                 shred_forums.createPost( comment, "_", null, parent_nevent, this_post_is_a_level_1_comment );
             }
             var showPage = page => {
