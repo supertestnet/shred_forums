@@ -653,7 +653,7 @@
                     showModal( html );
                     await super_nostr.waitSomeSeconds( 1 );
                     var msg = `This is your Shred Forums account. Reply to this message with your Proof of Ownership and nothing else. If you did not expect this message, ignore it.`;
-                    var dm_event = await shred_forums.prepKind17dm( msg, auth_privkey, main_pubkey, main_relays );
+                    var dm_event = await shred_forums.prepNip17dm( msg, auth_privkey, main_pubkey, main_relays );
                     super_nostr.sendEvent( dm_event, main_relays[ 0 ] );
                     var loop = async () => {
                         var events = await super_nostr.getEvents( main_relays[ 0 ], null, null, [ 1059 ], null, Math.floor( Date.now() / 1000 ) - ( 86400 * 10 ), 1, null, [ auth_pubkey ] );
@@ -682,7 +682,7 @@
                     super_nostr.sendEvent( profile_event, "wss://nos.lol/" );
                     showModal( `<p>You have successfully linked your account to nostr` );
                 },
-                prepKind17dm: async ( msg, sender_privkey, recipient_pubkey, recipient_relays ) => {
+                prepNip17dm: async ( msg, sender_privkey, recipient_pubkey, recipient_relays ) => {
                     var rumor = await super_nostr.prepEvent( sender_privkey, msg, 14, [ [ "p", recipient_pubkey, recipient_relays[ 0 ] ] ] );
                     delete rumor.sig;
                     var conversation_key_1 = nip44.utils.getConversationKey( sender_privkey, recipient_pubkey );
