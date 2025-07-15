@@ -646,7 +646,7 @@
                     var subkey_pubkey = super_nostr.getPubkey( shred_forums.privkey );
                     var proof_of_ownership = await nobleSecp256k1.schnorr.sign( subkey_pubkey, shred_forums.privkey );
                     var html = `
-                        <p>The following string is a Proof of Ownership. Use your main nostr account to DM it back to us; note that you MUST use kind04 "legacy" DMs because nip17 DMs are unreliable. Your nostr DMs should have a message for you to reply to. Reply with this Proof of Ownership and nothing else.</p>
+                        <p>The following string is a Proof of Ownership. Use your main nostr account to DM it back to us; note that you MUST use nip17 "secure" DMs because nip04 DMs leak too much metadata. Your nostr DMs should have a message for you to reply to. Reply with this Proof of Ownership and nothing else.</p>
                         <p class="proof_of_ownership">${shred_forums.hexToBase64( proof_of_ownership )}</p>
                         <p>Listening for the DM...</p>
                     `;
